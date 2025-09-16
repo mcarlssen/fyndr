@@ -1,0 +1,72 @@
+[
+  {
+    "name": "High Scoring",
+    "players": 160,
+    "revenue": 1956.3481918353114,
+    "avg_points": 1618.46953125,
+    "avg_scans": 0,
+    "growth_score": 117.86904457550594,
+    "retention_score": 971.0817187499999,
+    "overall_score": 459.15411424530356
+  },
+  {
+    "name": "Low Price",
+    "players": 160,
+    "revenue": 1681.8462053084322,
+    "avg_points": 1424.296875,
+    "avg_scans": 0,
+    "growth_score": 117.0455386159253,
+    "retention_score": 854.578125,
+    "overall_score": 412.0585731695552
+  },
+  {
+    "name": "High Caps",
+    "players": 160,
+    "revenue": 1990.4900957170635,
+    "avg_points": 1407.603125,
+    "avg_scans": 0,
+    "growth_score": 117.97147028715119,
+    "retention_score": 844.561875,
+    "overall_score": 408.6076321722907
+  },
+  {
+    "name": "Base Config",
+    "players": 160,
+    "revenue": 1981.760941363405,
+    "avg_points": 1315.2625,
+    "avg_scans": 0,
+    "growth_score": 117.94528282409021,
+    "retention_score": 789.1575,
+    "overall_score": 386.43016969445415
+  },
+  {
+    "name": "High Price",
+    "players": 160,
+    "revenue": 2015.240737525834,
+    "avg_points": 1189.5125,
+    "avg_scans": 0,
+    "growth_score": 118.0457222125775,
+    "retention_score": 713.7075,
+    "overall_score": 356.3104333275465
+  },
+  {
+    "name": "Low Caps",
+    "players": 160,
+    "revenue": 1886.2861498303412,
+    "avg_points": 1014.8375,
+    "avg_scans": 0,
+    "growth_score": 117.65885844949102,
+    "retention_score": 608.9024999999999,
+    "overall_score": 314.1563150696946
+  },
+  {
+    "name": "Low Scoring",
+    "players": 160,
+    "revenue": 1899.7446654198309,
+    "avg_points": 961.49453125,
+    "avg_scans": 0,
+    "growth_score": 117.6992339962595,
+    "retention_score": 576.89671875,
+    "overall_score": 301.3782278977557
+  }
+]
