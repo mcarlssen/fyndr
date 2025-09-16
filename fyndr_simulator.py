@@ -292,6 +292,21 @@ class FYNDRSimulator:
                     location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
                     venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
                     self.add_sticker(player.id, location, venue, player.level)
+            
+            # Weekly reinvestment: $6-12 variable amount
+            reinvestment_amount = random.uniform(6.0, 12.0)
+            player.money_spent += reinvestment_amount
+            # Convert dollars to points for reinvestment
+            reinvestment_points = reinvestment_amount * self.config.points_per_dollar
+            # Buy packs with reinvestment points
+            packs_from_reinvestment = int(reinvestment_points // self.config.pack_price_points)
+            if packs_from_reinvestment > 0:
+                player.stickers_owned += packs_from_reinvestment * 6
+                # Place new stickers from reinvestment
+                for _ in range(min(packs_from_reinvestment * 2, 8)):  # Place up to 2 stickers per pack
+                    location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
+                    venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
+                    self.add_sticker(player.id, location, venue, player.level)
         
         # Moderate scanning activity
         scans_today = random.randint(5, 12)
@@ -327,9 +342,25 @@ class FYNDRSimulator:
                 )
                 self.simulate_scan(player.id, sticker.id, scan_location)
         
-        # Occasional pack purchase with points
-        if day % 14 == 0 and player.total_points >= self.config.pack_price_points:
-            if random.random() < 0.3:  # 30% chance to buy with points
+        # Weekly reinvestment: 10% of total points (minimum 1 pack worth)
+        if day % 7 == 0:  # Weekly reinvestment
+            if player.total_points >= self.config.pack_price_points:
+                reinvestment_points = max(int(player.total_points * 0.10), self.config.pack_price_points)
+                # Buy packs with reinvestment points
+                packs_from_reinvestment = reinvestment_points // self.config.pack_price_points
+                if packs_from_reinvestment > 0:
+                    player.total_points -= packs_from_reinvestment * self.config.pack_price_points
+                    player.stickers_owned += packs_from_reinvestment * 6
+                    
+                    # Place new stickers from reinvestment
+                    for _ in range(min(packs_from_reinvestment * 2, 6)):  # Place up to 2 stickers per pack
+                        location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
+                        venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
+                        self.add_sticker(player.id, location, venue, player.level)
+        
+        # Occasional pack purchase with points (less frequent now due to weekly reinvestment)
+        if day % 21 == 0 and player.total_points >= self.config.pack_price_points:
+            if random.random() < 0.2:  # 20% chance to buy with points (reduced from 30%)
                 player.total_points -= self.config.pack_price_points
                 player.stickers_owned += 6
                 
@@ -357,9 +388,25 @@ class FYNDRSimulator:
                 )
                 self.simulate_scan(player.id, sticker.id, scan_location)
         
-        # Occasional purchase
-        if day % 21 == 0:  # Every 3 weeks
-            if random.random() < 0.4:  # 40% chance to buy
+        # Weekly reinvestment: 10% of total points (minimum 1 pack worth)
+        if day % 7 == 0:  # Weekly reinvestment
+            if player.total_points >= self.config.pack_price_points:
+                reinvestment_points = max(int(player.total_points * 0.10), self.config.pack_price_points)
+                # Buy packs with reinvestment points
+                packs_from_reinvestment = reinvestment_points // self.config.pack_price_points
+                if packs_from_reinvestment > 0:
+                    player.total_points -= packs_from_reinvestment * self.config.pack_price_points
+                    player.stickers_owned += packs_from_reinvestment * 6
+                    
+                    # Place new stickers from reinvestment
+                    for _ in range(min(packs_from_reinvestment * 2, 4)):  # Place up to 2 stickers per pack
+                        location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
+                        venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
+                        self.add_sticker(player.id, location, venue, player.level)
+        
+        # Occasional purchase (less frequent now due to weekly reinvestment)
+        if day % 28 == 0:  # Every 4 weeks (increased from 3 weeks)
+            if random.random() < 0.3:  # 30% chance to buy (reduced from 40%)
                 cost = self.config.pack_price_dollars
                 player.money_spent += cost
                 player.stickers_owned += 6
@@ -554,4 +601,3 @@ def main():
 
 if __name__ == "__main__":
     simulator = main()
-EOF
