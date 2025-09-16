@@ -279,20 +279,6 @@ class FYNDRSimulator:
     
     def simulate_whale_behavior(self, player: Player, day: int):
         """Simulate whale player behavior"""
-        # Whales buy packs regularly
-        if day % 7 == 0:  # Weekly purchase
-            if random.random() < 0.8:  # 80% chance to buy
-                packs_bought = random.randint(1, 3)
-                cost = packs_bought * self.config.pack_price_dollars
-                player.money_spent += cost
-                player.stickers_owned += packs_bought * 6  # 6 stickers per pack
-                
-                # Place some new stickers
-                for _ in range(min(packs_bought * 2, 6)):  # Place up to 2 stickers per pack
-                    location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
-                    venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
-                    self.add_sticker(player.id, location, venue, player.level)
-        
         # Moderate scanning activity
         scans_today = random.randint(5, 12)
         for _ in range(scans_today):
@@ -326,18 +312,6 @@ class FYNDRSimulator:
                     sticker.location[1] + random.uniform(-0.01, 0.01)
                 )
                 self.simulate_scan(player.id, sticker.id, scan_location)
-        
-        # Occasional pack purchase with points
-        if day % 14 == 0 and player.total_points >= self.config.pack_price_points:
-            if random.random() < 0.3:  # 30% chance to buy with points
-                player.total_points -= self.config.pack_price_points
-                player.stickers_owned += 6
-                
-                # Place new stickers
-                for _ in range(3):
-                    location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
-                    venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
-                    self.add_sticker(player.id, location, venue, player.level)
     
     def simulate_casual_behavior(self, player: Player, day: int):
         """Simulate casual player behavior"""
@@ -438,7 +412,52 @@ class FYNDRSimulator:
             
             # Weekly reset
             if day % 7 == 0:
+                # Perform weekly reinvestment before weekly reset
+                self.perform_weekly_reinvestment()
                 self.reset_weekly_stats()
+
+    def perform_weekly_reinvestment(self):
+        """Players reinvest weekly into new stickers.
+        - Grinders invest 10% of their current points into packs (points-based)
+        - Whales invest a variable $6-12 weekly into packs (cash-based)
+        New stickers are placed following existing placement patterns per type.
+        """
+        for player in self.players.values():
+            # Grinders: spend 10% of points on packs
+            if player.player_type == "grinder":
+                if self.config.pack_price_points > 0 and player.total_points > 0:
+                    budget_points = int(player.total_points * 0.10)
+                    packs = budget_points // self.config.pack_price_points
+                    if packs > 0:
+                        points_spent = packs * self.config.pack_price_points
+                        player.total_points -= points_spent
+                        player.stickers_owned += packs * 6
+                        # Place new stickers: follow grinder behavior (place ~3 per pack)
+                        stickers_to_place = min(packs * 3, packs * 6)
+                        for _ in range(stickers_to_place):
+                            location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
+                            venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
+                            self.add_sticker(player.id, location, venue, player.level)
+
+            # Whales: spend $6-12 on packs weekly
+            elif player.player_type == "whale":
+                pack_price = self.config.pack_price_dollars
+                if pack_price > 0:
+                    spend_dollars = random.uniform(6.0, 12.0)
+                    packs = int(spend_dollars // pack_price)
+                    # Ensure at least 1 pack if possible under default pricing
+                    if packs <= 0 and spend_dollars >= pack_price:
+                        packs = 1
+                    if packs > 0:
+                        actual_spend = packs * pack_price
+                        player.money_spent += actual_spend
+                        player.stickers_owned += packs * 6
+                        # Place new stickers: follow whale behavior (up to 2 per pack, capped at 6 total per week)
+                        stickers_to_place = min(packs * 2, 6)
+                        for _ in range(stickers_to_place):
+                            location = (random.uniform(40.0, 41.0), random.uniform(-74.0, -73.0))
+                            venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
+                            self.add_sticker(player.id, location, venue, player.level)
     
     def get_economy_summary(self) -> Dict:
         """Get a summary of the economy"""
@@ -554,4 +573,3 @@ def main():
 
 if __name__ == "__main__":
     simulator = main()
-EOF
