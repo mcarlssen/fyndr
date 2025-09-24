@@ -148,6 +148,9 @@ class CompleteSimulationAnalyzer:
         # Calculate key metrics
         self._calculate_complete_metrics()
         
+        # Analyze level mechanics
+        self._analyze_level_mechanics()
+        
         # Analyze trends
         self._analyze_trends()
     
@@ -204,6 +207,65 @@ class CompleteSimulationAnalyzer:
             print(f"    Average Scans: {avg_scans:.1f}")
             print(f"    Average Days Active: {avg_days_active:.1f}")
     
+    def _analyze_level_mechanics(self):
+        """Analyze level-up mechanics and progression"""
+        players = self.combined_data['players']
+        config = self.combined_data['config']
+        max_level = config.get('max_level', 50)
+        
+        whale_players = [p for p in players.values() if p.get('player_type') == 'whale']
+        grinder_players = [p for p in players.values() if p.get('player_type') == 'grinder']
+        casual_players = [p for p in players.values() if p.get('player_type') == 'casual']
+        
+        print(f"\n🎯 LEVEL-UP MECHANICS ANALYSIS:")
+        print(f"  Maximum Level: {max_level}")
+        
+        for player_type, players_list in [("Whale", whale_players), ("Grinder", grinder_players), ("Casual", casual_players)]:
+            if not players_list:
+                continue
+                
+            # Get levels for this player type
+            levels = [p.get('level', 1) for p in players_list]
+            avg_level = np.mean(levels)
+            max_level_reached = max(levels)
+            min_level = min(levels)
+            
+            # Count players at max level
+            max_level_count = sum(1 for level in levels if level >= max_level)
+            max_level_percentage = (max_level_count / len(players_list)) * 100
+            
+            # Find first player to reach max level (if any)
+            first_to_max = None
+            if max_level_count > 0:
+                # Find players who reached max level and their join day
+                max_level_players = [p for p in players_list if p.get('level', 1) >= max_level]
+                if max_level_players:
+                    first_to_max = min(max_level_players, key=lambda p: p.get('join_day', 0))
+                    days_to_max = first_to_max.get('join_day', 0)  # This would need to be calculated differently
+                    # For now, we'll use a placeholder since we don't track when they reached max level
+            
+            print(f"\n  {player_type.upper()} PLAYERS LEVEL ANALYSIS:")
+            print(f"    Average Level: {avg_level:.1f}")
+            print(f"    Highest Level Reached: {max_level_reached}")
+            print(f"    Lowest Level: {min_level}")
+            print(f"    Players at Max Level: {max_level_count}/{len(players_list)} ({max_level_percentage:.1f}%)")
+            
+            if first_to_max:
+                print(f"    First to Max Level: Player {first_to_max.get('id', 'Unknown')} (Day {first_to_max.get('join_day', 'Unknown')})")
+            else:
+                print(f"    First to Max Level: None reached max level")
+        
+        # Overall level distribution
+        all_levels = [p.get('level', 1) for p in players.values()]
+        overall_avg_level = np.mean(all_levels)
+        overall_max_level = max(all_levels)
+        overall_max_level_count = sum(1 for level in all_levels if level >= max_level)
+        
+        print(f"\n  OVERALL LEVEL STATISTICS:")
+        print(f"    Average Level (All Players): {overall_avg_level:.1f}")
+        print(f"    Highest Level Reached: {overall_max_level}")
+        print(f"    Total Players at Max Level: {overall_max_level_count}/{len(players)} ({(overall_max_level_count/len(players)*100):.1f}%)")
+    
     def _analyze_trends(self):
         """Analyze trends over time"""
         daily_stats = self.combined_data['daily_stats']
@@ -251,8 +313,8 @@ class CompleteSimulationAnalyzer:
         # Convert to DataFrame for easier plotting
         df = pd.DataFrame(self.combined_data['daily_stats'])
         
-        # Create figure with subplots
-        fig, axes = plt.subplots(3, 3, figsize=(24, 18))
+        # Create figure with subplots (4x3 to include level scatter plot)
+        fig, axes = plt.subplots(4, 3, figsize=(24, 24))
         fig.suptitle('Complete FYNDR Life Simulation Analysis', fontsize=20)
         
         # Plot 1: Player count over time
@@ -322,6 +384,15 @@ class CompleteSimulationAnalyzer:
             axes[2, 2].set_ylabel('Revenue ($)')
             axes[2, 2].grid(True, alpha=0.3)
         
+        # Plot 10: Player levels scatter plot by type
+        self._create_level_scatter_plot(axes[3, 0])
+        
+        # Plot 11: Level distribution histogram
+        self._create_level_histogram(axes[3, 1])
+        
+        # Plot 12: Level progression over time (if available)
+        self._create_level_progression_plot(axes[3, 2], df)
+        
         plt.tight_layout()
         
         # Save the plot
@@ -330,6 +401,85 @@ class CompleteSimulationAnalyzer:
         plt.close()
         
         print(f"Complete visualizations saved to {output_file}")
+    
+    def _create_level_scatter_plot(self, ax):
+        """Create a scatter plot showing player levels by type"""
+        players = self.combined_data['players']
+        
+        # Separate players by type
+        whale_players = [p for p in players.values() if p.get('player_type') == 'whale']
+        grinder_players = [p for p in players.values() if p.get('player_type') == 'grinder']
+        casual_players = [p for p in players.values() if p.get('player_type') == 'casual']
+        
+        # Create scatter plot data
+        whale_levels = [p.get('level', 1) for p in whale_players]
+        grinder_levels = [p.get('level', 1) for p in grinder_players]
+        casual_levels = [p.get('level', 1) for p in casual_players]
+        
+        # Create x-coordinates for jittering
+        whale_x = np.random.normal(1, 0.1, len(whale_levels))
+        grinder_x = np.random.normal(2, 0.1, len(grinder_levels))
+        casual_x = np.random.normal(3, 0.1, len(casual_levels))
+        
+        # Plot each player type
+        if whale_levels:
+            ax.scatter(whale_x, whale_levels, alpha=0.6, color='gold', s=50, label=f'Whales (n={len(whale_levels)})')
+        if grinder_levels:
+            ax.scatter(grinder_x, grinder_levels, alpha=0.6, color='silver', s=50, label=f'Grinders (n={len(grinder_levels)})')
+        if casual_levels:
+            ax.scatter(casual_x, casual_levels, alpha=0.6, color='brown', s=50, label=f'Casuals (n={len(casual_levels)})')
+        
+        ax.set_xlabel('Player Type')
+        ax.set_ylabel('Player Level')
+        ax.set_title('Player Levels by Type (Final)')
+        ax.set_xticks([1, 2, 3])
+        ax.set_xticklabels(['Whales', 'Grinders', 'Casuals'])
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Add average level lines
+        if whale_levels:
+            ax.axhline(y=np.mean(whale_levels), color='gold', linestyle='--', alpha=0.7, label=f'Whale Avg: {np.mean(whale_levels):.1f}')
+        if grinder_levels:
+            ax.axhline(y=np.mean(grinder_levels), color='silver', linestyle='--', alpha=0.7, label=f'Grinder Avg: {np.mean(grinder_levels):.1f}')
+        if casual_levels:
+            ax.axhline(y=np.mean(casual_levels), color='brown', linestyle='--', alpha=0.7, label=f'Casual Avg: {np.mean(casual_levels):.1f}')
+    
+    def _create_level_histogram(self, ax):
+        """Create a histogram showing level distribution"""
+        players = self.combined_data['players']
+        all_levels = [p.get('level', 1) for p in players.values()]
+        
+        # Create histogram
+        ax.hist(all_levels, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+        ax.set_xlabel('Player Level')
+        ax.set_ylabel('Number of Players')
+        ax.set_title('Distribution of Player Levels')
+        ax.grid(True, alpha=0.3)
+        
+        # Add statistics
+        mean_level = np.mean(all_levels)
+        median_level = np.median(all_levels)
+        ax.axvline(mean_level, color='red', linestyle='--', label=f'Mean: {mean_level:.1f}')
+        ax.axvline(median_level, color='green', linestyle='--', label=f'Median: {median_level:.1f}')
+        ax.legend()
+    
+    def _create_level_progression_plot(self, ax, df):
+        """Create a plot showing level progression over time (if available)"""
+        # Check if we have level data in daily stats
+        if 'avg_level' in df.columns:
+            ax.plot(df['day'], df['avg_level'], 'purple', linewidth=2)
+            ax.set_xlabel('Day')
+            ax.set_ylabel('Average Level')
+            ax.set_title('Average Player Level Over Time')
+            ax.grid(True, alpha=0.3)
+        else:
+            # If no level progression data, show a placeholder
+            ax.text(0.5, 0.5, 'Level progression data\nnot available in daily stats', 
+                   ha='center', va='center', transform=ax.transAxes, fontsize=12)
+            ax.set_title('Level Progression Over Time')
+            ax.set_xlabel('Day')
+            ax.set_ylabel('Average Level')
     
     def export_complete_data(self, output_dir: str = "complete_simulation_analysis"):
         """Export complete simulation data to CSV files"""
@@ -400,6 +550,99 @@ class CompleteSimulationAnalyzer:
         print(f"  - complete_players.csv: All player data")
         print(f"  - complete_stickers.csv: All sticker data")
         print(f"  - simulation_summary.csv: Key summary metrics")
+    
+    def generate_level_focused_report(self, output_dir: str = "complete_simulation_analysis"):
+        """Generate a focused report on level mechanics and progression"""
+        players = self.combined_data['players']
+        config = self.combined_data['config']
+        max_level = config.get('max_level', 50)
+        
+        print(f"\n" + "="*80)
+        print("LEVEL MECHANICS FOCUSED ANALYSIS")
+        print("="*80)
+        
+        # Overall level statistics
+        all_levels = [p.get('level', 1) for p in players.values()]
+        overall_stats = {
+            'total_players': len(players),
+            'avg_level': np.mean(all_levels),
+            'median_level': np.median(all_levels),
+            'max_level_reached': max(all_levels),
+            'min_level': min(all_levels),
+            'players_at_max': sum(1 for level in all_levels if level >= max_level),
+            'level_std': np.std(all_levels)
+        }
+        
+        print(f"\n📊 OVERALL LEVEL STATISTICS:")
+        print(f"  Total Players: {overall_stats['total_players']}")
+        print(f"  Average Level: {overall_stats['avg_level']:.2f}")
+        print(f"  Median Level: {overall_stats['median_level']:.1f}")
+        print(f"  Highest Level Reached: {overall_stats['max_level_reached']}")
+        print(f"  Lowest Level: {overall_stats['min_level']}")
+        print(f"  Players at Max Level: {overall_stats['players_at_max']} ({overall_stats['players_at_max']/overall_stats['total_players']*100:.1f}%)")
+        print(f"  Level Standard Deviation: {overall_stats['level_std']:.2f}")
+        
+        # Level distribution by player type
+        print(f"\n🎯 LEVEL DISTRIBUTION BY PLAYER TYPE:")
+        
+        for player_type in ['whale', 'grinder', 'casual']:
+            type_players = [p for p in players.values() if p.get('player_type') == player_type]
+            if not type_players:
+                continue
+                
+            type_levels = [p.get('level', 1) for p in type_players]
+            type_stats = {
+                'count': len(type_players),
+                'avg_level': np.mean(type_levels),
+                'max_level': max(type_levels),
+                'min_level': min(type_levels),
+                'at_max': sum(1 for level in type_levels if level >= max_level),
+                'std': np.std(type_levels)
+            }
+            
+            print(f"\n  {player_type.upper()} PLAYERS ({type_stats['count']} total):")
+            print(f"    Average Level: {type_stats['avg_level']:.2f}")
+            print(f"    Highest Level: {type_stats['max_level']}")
+            print(f"    Lowest Level: {type_stats['min_level']}")
+            print(f"    At Max Level: {type_stats['at_max']} ({type_stats['at_max']/type_stats['count']*100:.1f}%)")
+            print(f"    Level Std Dev: {type_stats['std']:.2f}")
+        
+        # Level progression analysis
+        print(f"\n📈 LEVEL PROGRESSION INSIGHTS:")
+        
+        # Find players who reached high levels
+        high_level_players = [p for p in players.values() if p.get('level', 1) >= max_level * 0.8]
+        print(f"  Players at 80%+ of max level: {len(high_level_players)} ({len(high_level_players)/len(players)*100:.1f}%)")
+        
+        # Find the most active players (by level)
+        top_level_players = sorted(players.values(), key=lambda p: p.get('level', 1), reverse=True)[:10]
+        print(f"\n  TOP 10 PLAYERS BY LEVEL:")
+        for i, player in enumerate(top_level_players, 1):
+            print(f"    {i:2d}. Player {player.get('id', 'Unknown')} - Level {player.get('level', 1)} ({player.get('player_type', 'Unknown')})")
+        
+        # Save level-focused data
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Export level data
+        level_data = []
+        for player_id, player in players.items():
+            level_data.append({
+                'player_id': player_id,
+                'player_type': player.get('player_type', 'unknown'),
+                'level': player.get('level', 1),
+                'total_points': player.get('total_points', 0),
+                'total_xp': player.get('total_xp', 0),
+                'days_active': player.get('days_active', 0),
+                'join_day': player.get('join_day', 0)
+            })
+        
+        level_df = pd.DataFrame(level_data)
+        level_file = os.path.join(output_dir, 'player_levels.csv')
+        level_df.to_csv(level_file, index=False)
+        
+        print(f"\n💾 Level data exported to {level_file}")
+        
+        return overall_stats
 
 def main():
     """Main function"""
@@ -420,6 +663,9 @@ def main():
         
         # Generate complete summary report
         analyzer.generate_complete_summary_report()
+        
+        # Generate level-focused report
+        analyzer.generate_level_focused_report(args.output_dir)
         
         # Generate visualizations
         if not args.no_viz:

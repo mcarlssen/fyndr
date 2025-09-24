@@ -49,20 +49,17 @@ class LifeSimConfig:
     
     # === SIMULATION CONTROL ===
     simulation_name: str = "FYNDR Life Sim - Population Mechanics"
-    max_days: int = 90  # 0 = run indefinitely
-    real_time_speed: float = 10  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
-    auto_save_interval: int = 270  # Save every N days
+    max_days: int = 270  # 0 = run indefinitely
+    real_time_speed: float = 100  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
+    auto_save_interval: int = 271  # Save every N days
     enable_visualization: bool = True
     enable_console_output: bool = True
+    auto_analyze_on_completion: bool = False  # Automatically run analysis when simulation completes
     
     # === CORE SCORING PARAMETERS ===
     owner_base_points: float = 2.0
     scanner_base_points: float = 1.0
     unique_scanner_bonus: float = 1.0
-    
-    # === DIMINISHING RETURNS ===
-    diminishing_threshold: int = 300000
-    diminishing_rates: List[float] = None  # Will be set in __post_init__
     
     # === DIVERSITY BONUSES ===
     geo_diversity_radius: float = 500.0  # meters
@@ -70,9 +67,10 @@ class LifeSimConfig:
     venue_variety_bonus: float = 2.5
     
     # === SOCIAL MECHANICS ===
-    social_sneeze_threshold: int = 3
-    social_sneeze_bonus: float = 3.0
-    social_sneeze_cap: int = 1
+    social_sneeze_threshold: int = 3  # Scans needed to trigger sneeze mode
+    social_sneeze_bonus: float = 3.0  # Point multiplier during sneeze mode
+    social_sneeze_duration_hours: float = 3.0  # How long sneeze mode lasts (hours)
+    social_sneeze_cap: int = 1  # Maximum social sneeze bonuses per day (deprecated with sneeze mode)
     
     # === LEVELING SYSTEM ===
     points_per_level: int = 200
@@ -90,7 +88,7 @@ class LifeSimConfig:
     level_multiplier_increment: float = 0.05  # Multiplier increase per level
     
     # === LOCALE AND SCANNING BEHAVIOR ===
-    locale_size_meters: float = 500.0  # Locale size in meters (500m square)
+    locale_size_meters: float = 804.5  # Locale size in meters (804.5m square = 1 quarter sq mi)
     sticker_density_per_quarter_sq_mile: int = 500  # Average stickers per 0.25 sq mi
     
     # Player type scanning behavior (percentage of available stickers per day)
@@ -98,13 +96,30 @@ class LifeSimConfig:
     grinder_scan_percentage: float = 0.40  # 40% of available stickers per day
     casual_scan_percentage: float = 0.07  # 7% of available stickers per day
     
+    # === STICKER DENSITY LIMITS ===
+    sticker_placement_cooldown_days: int = 1  # Minimum days between sticker placements per player
+    
     # === MONETIZATION ===
     pack_price_points: int = 300
     pack_price_dollars: float = 3.0
     points_per_dollar: float = 100.0
-    wallet_topup_min: float = 5.0
-    wallet_topup_max: float = 50.0
+    wallet_topup_min: float = 6.0
+    wallet_topup_max: float = 60.0
     
+    # === PURCHASING BEHAVIOR ===
+    # Whale purchasing behavior
+    whale_purchase_probability: float = 0.083  # 8% chance to spend money daily
+    whale_purchase_min: float = 3.0  # Minimum purchase amount
+    whale_purchase_max: float = 9.0  # Maximum purchase amount
+    
+    # Casual purchasing behavior  
+    casual_purchase_probability: float = 0.00033  # 1% chance per month to spend money
+    casual_purchase_min: float = 3.0  # Minimum purchase amount
+    casual_purchase_max: float = 3.0  # Maximum purchase amount
+    
+    # Grinder purchasing behavior (points-based, level-up triggered)
+    grinder_reinvest_on_levelup: bool = True  # Grinders reinvest all points when leveling up
+    grinder_reinvest_percentage: float = 1.0  # 100% of points reinvested on level up
     
     # === SCANNING MECHANICS ===
     sticker_scan_cooldown_hours: int = 11
@@ -116,26 +131,31 @@ class LifeSimConfig:
     churn_probability_casual: float = 0.002
     
     # === BONUS SYSTEMS ===
-    streak_bonus_days: int = 7
-    streak_bonus_multiplier: float = 1.5
-    comeback_bonus_days: int = 3
-    comeback_bonus_multiplier: float = 2.0
+    # Streak bonus: Rewards consecutive daily activity (no cooldown, resets if inactive)
+    streak_bonus_days: int = 7  # Days of consecutive activity needed
+    streak_bonus_multiplier: float = 1.5  # Point multiplier during streak
+    
+    # Comeback bonus: Rewards players returning after absence (no cooldown, triggers once per return)
+    comeback_bonus_days: int = 3  # Days away needed to trigger comeback bonus
+    comeback_bonus_multiplier: float = 2.0  # Point multiplier for comeback
     
     # === NEW PLAYER ONBOARDING ===
-    new_player_bonus_days: int = 7
-    new_player_bonus_multiplier: float = 2.0
-    new_player_free_packs: int = 0
+    # New player bonus: Boosts new players for their first week (no cooldown, one-time per player)
+    new_player_bonus_days: int = 7  # Days of bonus for new players
+    new_player_bonus_multiplier: float = 2.0  # Point multiplier for new players
+    new_player_free_packs: int = 0  # Free sticker packs for new players
     
     # === EVENTS ===
-    event_frequency_days: int = 30
-    event_duration_days: int = 7
-    event_bonus_multiplier: float = 1.5
+    # Seasonal/special events: Randomly triggered events that boost all point earnings
+    event_frequency_days: int = 30  # Average days between events (randomly triggered)
+    event_duration_days: int = 7  # How long events last once triggered
+    event_bonus_multiplier: float = 1.5  # Point multiplier during events (applies to all scans)
     
     # === GROWTH PARAMETERS ===
     new_player_daily_probability: float = 0.1  # 10% chance per day
-    new_player_whale_probability: float = 0.05  # 5% of new players are whales
-    new_player_grinder_probability: float = 0.25  # 25% of new players are grinders
-    new_player_casual_probability: float = 0.70  # 70% of new players are casual
+    new_player_whale_probability: float = 0.02  # 3% of new players are whales
+    new_player_grinder_probability: float = 0.18  # 17% of new players are grinders
+    new_player_casual_probability: float = 0.80  # 80% of new players are casual
     
     # === POPULATION & SPREAD MECHANICS ===
     # Population variables for modeling game spread in a locale
@@ -143,14 +163,16 @@ class LifeSimConfig:
     population_density_per_quarter_sq_mile: float = 4000.0  # Population density per quarter square mile
     
     # Viral spread mechanics
-    viral_spread_percentage: float = 0.40  # 40% of active players recruit new players
-    viral_spread_frequency_days: int = 14  # Every 2 weeks
+    viral_spread_percentage: float = 0.20  # 20% of active players recruit new players
+    viral_spread_frequency_min_days: int = 10  # Minimum days between viral spread events
+    viral_spread_frequency_max_days: int = 18  # Maximum days between viral spread events
     viral_spread_cap_percentage: float = 0.40  # Maximum 40% of total population can be players
     
     # Organic growth mechanics
     organic_growth_rate_min: float = 0.002  # 0.2% minimum organic growth per 50 tags per week
     organic_growth_rate_max: float = 0.005  # 0.5% maximum organic growth per 50 tags per week
     organic_growth_tags_threshold: int = 50  # Number of tags required for organic growth calculation
+    organic_growth_area_radius_meters: float = 20.0  # Radius in meters for area-bounded organic growth
     
     # Player type distribution for new players (overrides individual probabilities when enabled)
     use_population_mechanics: bool = True  # Enable/disable population-based growth
@@ -166,23 +188,21 @@ class LifeSimConfig:
     
     def __post_init__(self):
         """Initialize default values for complex fields"""
-        if self.diminishing_rates is None:
-            self.diminishing_rates = [1.0, 0.6, 0.3]
         if self.venue_types is None:
             self.venue_types = ["restaurant", "cafe", "shop", "park", "school"]
         if self.venue_type_weights is None:
             self.venue_type_weights = [0.3, 0.2, 0.2, 0.2, 0.1]
         if self.new_player_type_ratios is None:
             self.new_player_type_ratios = {
-                'whale': 0.05,    # 5% whales
-                'grinder': 0.25,  # 25% grinders  
-                'casual': 0.70    # 70% casual
+                'whale': 0.02,    # 3% whales
+                'grinder': 0.18,  # 17% grinders  
+                'casual': 0.80    # 80% casual
             }
         if self.starting_player_type_ratios is None:
             self.starting_player_type_ratios = {
-                'whale': 0.05,    # 5% whales
-                'grinder': 0.25,  # 25% grinders  
-                'casual': 0.70    # 70% casual
+                'whale': 0.02,    # 3% whales
+                'grinder': 0.18,  # 17% grinders  
+                'casual': 0.80    # 80% casual
             }
         if self.level_xp_thresholds is None:
             self.level_xp_thresholds = self._calculate_xp_thresholds()
@@ -248,6 +268,11 @@ class Sticker:
     total_scans: int = 0
     unique_scanners: set = None
     
+    # Social sneeze mode tracking
+    is_in_sneeze_mode: bool = False
+    sneeze_mode_start_time: float = 0.0  # Time when sneeze mode started (in hours from day start)
+    sneeze_mode_triggered_at_scans: int = 0  # Scan count when sneeze mode was triggered
+    
     def __post_init__(self):
         if self.unique_scanners is None:
             self.unique_scanners = set()
@@ -278,6 +303,15 @@ class DailyStats:
     viral_recruits_today: int = 0
     organic_new_players_today: int = 0
     population_cap_reached: bool = False
+    
+    # Sticker density tracking
+    current_sticker_density: float = 0.0
+    max_stickers_allowed: int = 0
+    sticker_density_cap_reached: bool = False
+    
+    # Social sneeze mode tracking
+    stickers_in_sneeze_mode: int = 0
+    sneeze_mode_hotspots: List[Tuple[float, float]] = None  # Locations of sneeze mode stickers
 
 # ============================================================================
 # CORE SIMULATOR CLASS
@@ -311,9 +345,26 @@ class FYNDRLifeSimulator:
         self.viral_recruits_today = 0
         self.organic_new_players_today = 0
         self.max_possible_players = int(self.config.total_population * self.config.viral_spread_cap_percentage)
+        self.last_viral_spread_day = None  # Track when viral spread last occurred
+        
+        # === STICKER DENSITY TRACKING ===
+        self.max_stickers_allowed = self._calculate_max_stickers_allowed()
+        self.player_last_sticker_day = {}  # Track when each player last placed a sticker
         
         # Initialize with some starting players
         self._initialize_starting_population()
+    
+    def _calculate_max_stickers_allowed(self) -> int:
+        """Calculate the maximum number of stickers allowed based on locale area and density limits"""
+        # Convert locale size to quarter square miles
+        # 804.5m = 0.8045km = 0.8045/1.609 miles = 0.5 miles
+        # 0.5 miles square = 0.5^2 = 0.25 sq mi = 1 quarter sq mi
+        locale_area_quarter_sq_mi = (self.config.locale_size_meters / 1000 / 1.609) ** 2 / 0.25
+        
+        # Calculate target sticker count (hard cap, no multiplier)
+        max_stickers = int(locale_area_quarter_sq_mi * self.config.sticker_density_per_quarter_sq_mile)
+        
+        return max_stickers
         
     def _initialize_starting_population(self):
         """Initialize the game with a starting population"""
@@ -341,21 +392,31 @@ class FYNDRLifeSimulator:
             self.players[self.next_player_id] = player
             self.next_player_id += 1
         
-        # Create some initial stickers
-        for _ in range(100):
+        # Create some initial stickers (respecting density limits)
+        initial_stickers = min(100, self.max_stickers_allowed)
+        for _ in range(initial_stickers):
             self._create_new_sticker()
     
-    def _create_new_sticker(self):
-        """Create a new sticker in the game"""
+    def _create_new_sticker(self, player: Player = None):
+        """Create a new sticker in the game with density limits"""
+        # Check player cooldown if specified
+        if player and player.id in self.player_last_sticker_day:
+            days_since_last_sticker = self.current_day - self.player_last_sticker_day[player.id]
+            if days_since_last_sticker < self.config.sticker_placement_cooldown_days:
+                return False
+        
         if not self.players:
-            return
+            return False
             
-        # Choose a random active player as owner
-        active_players = [p for p in self.players.values() if p.is_active]
-        if not active_players:
-            return
+        # Choose a random active player as owner if not specified
+        if player is None:
+            active_players = [p for p in self.players.values() if p.is_active]
+            if not active_players:
+                return False
+            owner = random.choice(active_players)
+        else:
+            owner = player
             
-        owner = random.choice(active_players)
         venue_type = random.choices(
             self.config.venue_types,
             weights=self.config.venue_type_weights
@@ -367,6 +428,10 @@ class FYNDRLifeSimulator:
             owner.location[1] + random.uniform(-0.01, 0.01)
         )
         
+        # Check if we've reached the density limit (check right before creating)
+        if len(self.stickers) >= self.max_stickers_allowed:
+            return False
+        
         sticker = Sticker(
             id=self.next_sticker_id,
             owner_id=owner.id,
@@ -376,14 +441,23 @@ class FYNDRLifeSimulator:
             creation_day=self.current_day
         )
         
-        self.stickers[self.next_sticker_id] = sticker
-        self.next_sticker_id += 1
-        self.total_stickers_placed += 1
-        
-        # Award points to owner
-        owner.total_points += self.config.owner_base_points
-        owner.stickers_placed += 1
-        self.total_points_earned += self.config.owner_base_points
+        # Atomic check and add - if we're at the limit, don't add the sticker
+        if len(self.stickers) < self.max_stickers_allowed:
+            self.stickers[self.next_sticker_id] = sticker
+            self.next_sticker_id += 1
+            self.total_stickers_placed += 1
+            
+            # Track player's last sticker placement
+            self.player_last_sticker_day[owner.id] = self.current_day
+            
+            # Award points to owner
+            owner.total_points += self.config.owner_base_points
+            owner.stickers_placed += 1
+            self.total_points_earned += self.config.owner_base_points
+            
+            return True
+        else:
+            return False
     
     def _simulate_player_behavior(self, player: Player):
         """Simulate a single player's behavior for one day"""
@@ -436,10 +510,10 @@ class FYNDRLifeSimulator:
     def _simulate_whale_behavior(self, player: Player):
         """Simulate whale player behavior"""
         # Whales are more likely to spend money
-        if random.random() < 0.3:  # 30% chance to spend money
+        if random.random() < self.config.whale_purchase_probability:
             spend_amount = random.uniform(
-                self.config.wallet_topup_min,
-                self.config.wallet_topup_max
+                self.config.whale_purchase_min,
+                self.config.whale_purchase_max
             )
             player.wallet_balance += spend_amount
             player.total_spent += spend_amount
@@ -447,7 +521,7 @@ class FYNDRLifeSimulator:
         
         # Whales place more stickers
         if random.random() < 0.8:  # 80% chance to place sticker
-            self._create_new_sticker()
+            self._create_new_sticker(player)
         
         # Whales scan more frequently
         if random.random() < 0.9:  # 90% chance to scan
@@ -455,9 +529,11 @@ class FYNDRLifeSimulator:
     
     def _simulate_grinder_behavior(self, player: Player):
         """Simulate grinder player behavior"""
-        # Grinders are very active but don't spend money
+        # Grinders don't make daily purchases - they reinvest points on level up
+        # This is handled in the _check_level_up method
+        
         if random.random() < 0.7:  # 70% chance to place sticker
-            self._create_new_sticker()
+            self._create_new_sticker(player)
         
         if random.random() < 0.8:  # 80% chance to scan
             self._simulate_scan_behavior(player)
@@ -466,14 +542,17 @@ class FYNDRLifeSimulator:
         """Simulate casual player behavior"""
         # Casual players are less active but more social
         if random.random() < 0.4:  # 40% chance to place sticker
-            self._create_new_sticker()
+            self._create_new_sticker(player)
         
         if random.random() < 0.5:  # 50% chance to scan
             self._simulate_scan_behavior(player)
         
         # Casual players might spend occasionally
-        if random.random() < 0.1:  # 10% chance to spend
-            spend_amount = random.uniform(5.0, 15.0)
+        if random.random() < self.config.casual_purchase_probability:
+            spend_amount = random.uniform(
+                self.config.casual_purchase_min,
+                self.config.casual_purchase_max
+            )
             player.wallet_balance += spend_amount
             player.total_spent += spend_amount
             self.total_revenue += spend_amount
@@ -497,12 +576,18 @@ class FYNDRLifeSimulator:
         # Choose a sticker to scan
         sticker = random.choice(available_stickers)
         
-        # Calculate points earned
-        points = self._calculate_scan_points(player, sticker)
+        # Get current time in hours (simplified - using day progress)
+        current_time_hours = (self.current_day % 1) * 24  # Hours within current day
         
-        # Award points and XP
-        player.total_points += points
-        player.total_xp += int(points)  # Convert points to XP
+        # Calculate points earned by scanner
+        scanner_points = self._calculate_scan_points(player, sticker, current_time_hours)
+        
+        # Calculate points earned by sticker owner
+        owner_points = self._calculate_owner_points(sticker, player, current_time_hours)
+        
+        # Award points and XP to scanner
+        player.total_points += scanner_points
+        player.total_xp += int(scanner_points)  # Convert points to XP
         player.stickers_scanned += 1
         player.days_since_last_scan = 0
         player.last_scan_times[sticker.id] = self.current_day
@@ -510,29 +595,38 @@ class FYNDRLifeSimulator:
         # Check for level up
         self._check_level_up(player)
         
+        # Award points to sticker owner (if not scanning their own sticker)
+        if sticker.owner_id != player.id:
+            owner = self.players.get(sticker.owner_id)
+            if owner and owner.is_active:
+                owner.total_points += owner_points
+                owner.total_xp += int(owner_points)  # Convert points to XP
+                # Check for owner level up
+                self._check_level_up(owner)
+        
         # Update sticker stats
         sticker.total_scans += 1
         sticker.unique_scanners.add(player.id)
         
         self.total_scans += 1
-        self.total_points_earned += points
+        self.total_points_earned += scanner_points + owner_points
     
-    def _calculate_scan_points(self, player: Player, sticker: Sticker) -> float:
+    def _calculate_scan_points(self, player: Player, sticker: Sticker, current_time_hours: float) -> float:
         """Calculate points earned from scanning a sticker"""
         base_points = self.config.scanner_base_points
         
-        # Apply level multiplier (dynamic calculation for all levels)
+        # Apply scanner's level multiplier (dynamic calculation for all levels)
         # Configurable base multiplier and increment per level
-        level_mult = self.config.level_multiplier_base + ((player.level - 1) * self.config.level_multiplier_increment)
+        scanner_level_mult = self.config.level_multiplier_base + ((player.level - 1) * self.config.level_multiplier_increment)
         
-        base_points *= level_mult
+        base_points *= scanner_level_mult
         
         # Apply diversity bonuses
         diversity_bonus = self._calculate_diversity_bonus(player, sticker)
         base_points *= diversity_bonus
         
         # Apply social sneeze bonus
-        social_bonus = self._calculate_social_bonus(player, sticker)
+        social_bonus = self._calculate_social_bonus(player, sticker, current_time_hours)
         base_points *= social_bonus
         
         # Apply event bonus
@@ -553,6 +647,43 @@ class FYNDRLifeSimulator:
         
         return base_points
     
+    def _calculate_owner_points(self, sticker: Sticker, scanner: Player, current_time_hours: float) -> float:
+        """Calculate points earned by the sticker owner when someone scans their sticker"""
+        base_points = self.config.owner_base_points
+        
+        # Apply sticker owner's level multiplier (this is the key missing piece!)
+        # Get the owner's level from the sticker
+        owner = self.players.get(sticker.owner_id)
+        if owner:
+            owner_level_mult = self.config.level_multiplier_base + ((owner.level - 1) * self.config.level_multiplier_increment)
+            base_points *= owner_level_mult
+        
+        # Apply diversity bonuses (owner gets same bonuses as scanner)
+        diversity_bonus = self._calculate_diversity_bonus(scanner, sticker)
+        base_points *= diversity_bonus
+        
+        # Apply social sneeze bonus
+        social_bonus = self._calculate_social_bonus(scanner, sticker, current_time_hours)
+        base_points *= social_bonus
+        
+        # Apply event bonus
+        if self.current_event:
+            base_points *= self.config.event_bonus_multiplier
+        
+        # Apply new player bonus (for the scanner, not owner)
+        if self.current_day - scanner.join_day <= self.config.new_player_bonus_days:
+            base_points *= self.config.new_player_bonus_multiplier
+        
+        # Apply streak bonus (for the scanner, not owner)
+        if scanner.streak_days >= self.config.streak_bonus_days:
+            base_points *= self.config.streak_bonus_multiplier
+        
+        # Apply comeback bonus (for the scanner, not owner)
+        if scanner.days_since_last_scan >= self.config.comeback_bonus_days:
+            base_points *= self.config.comeback_bonus_multiplier
+        
+        return base_points
+    
     def _check_level_up(self, player: Player):
         """Check if player should level up and handle the level up process"""
         if player.level >= self.config.max_level:
@@ -564,8 +695,31 @@ class FYNDRLifeSimulator:
         if player.total_xp >= next_level_xp:
             # Level up!
             player.level += 1
-            if self.config.enable_console_output:
-                print(f"🎉 Player {player.id} ({player.player_type}) leveled up to level {player.level}!")
+            
+            # Handle grinder reinvestment on level up
+            if (player.player_type == "grinder" and 
+                self.config.grinder_reinvest_on_levelup and 
+                player.total_points > 0):
+                
+                # Calculate how many points to reinvest
+                points_to_reinvest = player.total_points * self.config.grinder_reinvest_percentage
+                
+                # Convert points to dollars using the conversion rate
+                dollars_reinvested = points_to_reinvest / self.config.points_per_dollar
+                
+                # Add to wallet balance
+                player.wallet_balance += dollars_reinvested
+                player.total_spent += dollars_reinvested
+                self.total_revenue += dollars_reinvested
+                
+                # Reset points (they've been "spent")
+                player.total_points = 0
+                
+                # if self.config.enable_console_output:
+                    # print(f"💰 Grinder {player.id} reinvested {points_to_reinvest:.1f} points (${dollars_reinvested:.2f}) on level up!")
+            
+            # if self.config.enable_console_output:
+                # print(f"🎉 Player {player.id} ({player.player_type}) leveled up to level {player.level}!")
     
     def _calculate_diversity_bonus(self, player: Player, sticker: Sticker) -> float:
         """Calculate diversity bonus for scanning a sticker"""
@@ -596,21 +750,87 @@ class FYNDRLifeSimulator:
         
         return distance_meters > self.config.geo_diversity_radius
     
-    def _calculate_social_bonus(self, player: Player, sticker: Sticker) -> float:
-        """Calculate social sneeze bonus"""
-        if sticker.total_scans >= self.config.social_sneeze_threshold:
+    def _update_sneeze_mode_status(self, sticker: Sticker, current_time_hours: float):
+        """Update sticker's sneeze mode status based on current time"""
+        # Check if sticker should enter sneeze mode
+        if (not sticker.is_in_sneeze_mode and 
+            sticker.total_scans >= self.config.social_sneeze_threshold and
+            sticker.sneeze_mode_triggered_at_scans < self.config.social_sneeze_threshold):
+            # Trigger sneeze mode
+            sticker.is_in_sneeze_mode = True
+            sticker.sneeze_mode_start_time = current_time_hours
+            sticker.sneeze_mode_triggered_at_scans = sticker.total_scans
+            
+        # Check if sneeze mode should end
+        elif (sticker.is_in_sneeze_mode and 
+              current_time_hours - sticker.sneeze_mode_start_time >= self.config.social_sneeze_duration_hours):
+            # End sneeze mode
+            sticker.is_in_sneeze_mode = False
+            sticker.sneeze_mode_start_time = 0.0
+    
+    def _calculate_social_bonus(self, player: Player, sticker: Sticker, current_time_hours: float) -> float:
+        """Calculate social sneeze bonus based on sneeze mode status"""
+        # Update sneeze mode status first
+        self._update_sneeze_mode_status(sticker, current_time_hours)
+        
+        # Apply bonus if in sneeze mode
+        if sticker.is_in_sneeze_mode:
             return 1.0 + self.config.social_sneeze_bonus
         return 1.0
+    
+    def _calculate_organic_growth_areas(self) -> Dict[Tuple[float, float], List[Sticker]]:
+        """Calculate organic growth areas based on sticker density within radius"""
+        areas = {}
+        radius_meters = self.config.organic_growth_area_radius_meters
+        radius_degrees = radius_meters / 111000  # Convert meters to degrees (rough approximation)
+        
+        # Group stickers by proximity
+        for sticker in self.stickers.values():
+            if not sticker.is_active:
+                continue
+                
+            # Find existing area center within radius, or create new one
+            area_center = None
+            for center in areas.keys():
+                distance = math.sqrt(
+                    (sticker.location[0] - center[0])**2 + 
+                    (sticker.location[1] - center[1])**2
+                )
+                if distance <= radius_degrees:
+                    area_center = center
+                    break
+            
+            if area_center is None:
+                # Create new area center at this sticker's location
+                area_center = sticker.location
+                areas[area_center] = []
+            
+            areas[area_center].append(sticker)
+        
+        return areas
+    
+    def get_sneeze_mode_stickers(self, current_time_hours: float) -> List[Sticker]:
+        """Get all stickers currently in sneeze mode (for hotspot tracking)"""
+        sneeze_stickers = []
+        for sticker in self.stickers.values():
+            if sticker.is_active:
+                # Update sneeze mode status
+                self._update_sneeze_mode_status(sticker, current_time_hours)
+                if sticker.is_in_sneeze_mode:
+                    sneeze_stickers.append(sticker)
+        return sneeze_stickers
     
     def _calculate_daily_scans_for_player(self, player: Player) -> int:
         """Calculate how many scans a player should do per day based on their type and locale"""
         # Calculate available stickers in the locale
-        # Locale is 500m square = 0.25 sq km = 0.096 sq mi
-        # Convert to quarter square miles: 0.096 / 0.25 = 0.384 quarter sq mi
-        locale_area_quarter_sq_mi = (self.config.locale_size_meters / 1000) ** 2 / 0.25  # Convert to quarter sq mi
+        # Use the same calculation as the density limit for consistency
+        # 500m = 0.5km = 0.5/1.609 miles = 0.311 miles
+        # 0.5km square = 0.311^2 = 0.097 sq mi
+        # 0.097 sq mi / 0.25 = 0.388 quarter sq mi
+        locale_area_quarter_sq_mi = (self.config.locale_size_meters / 1000 / 1.609) ** 2 / 0.25
         
-        # Calculate available stickers in locale
-        available_stickers = int(locale_area_quarter_sq_mi * self.config.sticker_density_per_quarter_sq_mile)
+        # Calculate available stickers in locale (use actual sticker count, not density assumption)
+        available_stickers = len(self.stickers)  # Use actual stickers in the game
         
         # Get player type scan percentage
         if player.player_type == "whale":
@@ -643,29 +863,70 @@ class FYNDRLifeSimulator:
         if self.config.use_population_mechanics:
             # Use new population-based growth mechanics
             
-            # 1. Viral spread mechanics (40% of active players recruit 1 new player per 2 weeks)
-            if self.current_day % self.config.viral_spread_frequency_days == 0:
+            # 1. Viral spread mechanics (20% of active players recruit new players with random frequency)
+            # Check if it's time for viral spread (random interval between min and max days)
+            if hasattr(self, 'last_viral_spread_day'):
+                days_since_last_viral = self.current_day - self.last_viral_spread_day
+                min_days = self.config.viral_spread_frequency_min_days
+                max_days = self.config.viral_spread_frequency_max_days
+                if days_since_last_viral >= min_days and (days_since_last_viral >= max_days or random.random() < 0.3):
+                    # Trigger viral spread
+                    pass
+                else:
+                    # Not time for viral spread yet
+                    pass
+            else:
+                # First viral spread check - use random timing
+                if random.random() < 0.1:  # 10% chance on any given day initially
+                    pass
+                else:
+                    pass
+            
+            # Check if we should trigger viral spread
+            should_trigger_viral = False
+            if not hasattr(self, 'last_viral_spread_day'):
+                # First time - random chance
+                should_trigger_viral = random.random() < 0.1
+            else:
+                days_since_last_viral = self.current_day - self.last_viral_spread_day
+                min_days = self.config.viral_spread_frequency_min_days
+                max_days = self.config.viral_spread_frequency_max_days
+                if days_since_last_viral >= min_days:
+                    if days_since_last_viral >= max_days:
+                        should_trigger_viral = True  # Force trigger at max days
+                    else:
+                        # Random chance between min and max days
+                        chance = (days_since_last_viral - min_days) / (max_days - min_days)
+                        should_trigger_viral = random.random() < chance
+            
+            if should_trigger_viral:
                 active_players = [p for p in self.players.values() if p.is_active]
                 recruiting_players = int(len(active_players) * self.config.viral_spread_percentage)
                 viral_recruits = min(recruiting_players, self.max_possible_players - current_players)
                 new_players_count += viral_recruits
                 self.viral_recruits_today = viral_recruits
+                self.last_viral_spread_day = self.current_day  # Track when viral spread occurred
             
-            # 2. Organic growth based on sticker activity (daily calculation)
+            # 2. Organic growth based on sticker activity (daily calculation with area bounds)
             total_active_stickers = len([s for s in self.stickers.values() if s.is_active])
             if total_active_stickers >= self.config.organic_growth_tags_threshold:
-                # Calculate daily organic growth rate (divide weekly rate by 7)
-                sticker_density_factor = min(total_active_stickers / self.config.organic_growth_tags_threshold, 3.0)
-                daily_organic_rate = random.uniform(
-                    self.config.organic_growth_rate_min / 7,  # Convert weekly to daily
-                    self.config.organic_growth_rate_max / 7   # Convert weekly to daily
-                ) * sticker_density_factor
+                # Calculate area-bounded organic growth
+                organic_growth_areas = self._calculate_organic_growth_areas()
                 
-                # Apply to total population, not just current players
-                organic_new_players = int(self.config.total_population * daily_organic_rate)
-                organic_new_players = min(organic_new_players, self.max_possible_players - current_players - new_players_count)
-                new_players_count += organic_new_players
-                self.organic_new_players_today = organic_new_players
+                for area_center, area_stickers in organic_growth_areas.items():
+                    if len(area_stickers) >= self.config.organic_growth_tags_threshold:
+                        # Calculate daily organic growth rate for this area (divide weekly rate by 7)
+                        sticker_density_factor = min(len(area_stickers) / self.config.organic_growth_tags_threshold, 3.0)
+                        daily_organic_rate = random.uniform(
+                            self.config.organic_growth_rate_min / 7,  # Convert weekly to daily
+                            self.config.organic_growth_rate_max / 7   # Convert weekly to daily
+                        ) * sticker_density_factor
+                        
+                        # Apply to total population, not just current players
+                        area_organic_new_players = int(self.config.total_population * daily_organic_rate)
+                        area_organic_new_players = min(area_organic_new_players, self.max_possible_players - current_players - new_players_count)
+                        new_players_count += area_organic_new_players
+                        self.organic_new_players_today += area_organic_new_players
             
             # 3. Event boost for both viral and organic growth
             if self._is_event_active():
@@ -747,6 +1008,11 @@ class FYNDRLifeSimulator:
         
         avg_level = statistics.mean([p.level for p in active_players]) if active_players else 0
         
+        # Calculate sneeze mode statistics
+        current_time_hours = (self.current_day % 1) * 24  # Hours within current day
+        sneeze_stickers = self.get_sneeze_mode_stickers(current_time_hours)
+        sneeze_hotspots = [sticker.location for sticker in sneeze_stickers]
+        
         return DailyStats(
             day=self.current_day,
             total_players=len(active_players),
@@ -770,7 +1036,16 @@ class FYNDRLifeSimulator:
             population_penetration_rate=len(active_players) / self.config.total_population,
             viral_recruits_today=self.viral_recruits_today,
             organic_new_players_today=self.organic_new_players_today,
-            population_cap_reached=len(active_players) >= self.max_possible_players
+            population_cap_reached=len(active_players) >= self.max_possible_players,
+            
+            # === STICKER DENSITY METRICS ===
+            current_sticker_density=len(self.stickers) / ((self.config.locale_size_meters / 1000 / 1.609) ** 2 / 0.25),
+            max_stickers_allowed=self.max_stickers_allowed,
+            sticker_density_cap_reached=len(self.stickers) >= self.max_stickers_allowed,
+            
+            # === SOCIAL SNEEZE MODE METRICS ===
+            stickers_in_sneeze_mode=len(sneeze_stickers),
+            sneeze_mode_hotspots=sneeze_hotspots
         )
     
     def run_day(self):
@@ -841,16 +1116,21 @@ class FYNDRLifeSimulator:
             print("\nSimulation paused. Press Ctrl+C again to exit.")
             self.paused = True
             self.running = False
+        finally:
+            # Run analysis if enabled and simulation completed normally
+            if self.config.auto_analyze_on_completion and not self.paused:
+                self.run_analysis_on_completion()
     
     def _print_daily_summary(self, stats: DailyStats):
         """Print daily summary to console"""
+        sneeze_info = f" | Sneeze: {stats.stickers_in_sneeze_mode}" if stats.stickers_in_sneeze_mode > 0 else ""
         print(f"Day {stats.day:3d} | "
               f"Players: {stats.active_players:4d} | "
               f"Revenue: ${stats.total_revenue:8.2f} | "
               f"Scans: {stats.total_scans:5d} | "
               f"Stickers: {stats.total_stickers_placed:4d} | "
               f"Retention: {stats.retention_rate:.1%} | "
-              f"Growth: {stats.growth_rate:+.1%}")
+              f"Growth: {stats.growth_rate:+.1%}{sneeze_info}")
     
     def save_simulation_state(self, filename: str = None):
         """Save current simulation state to file"""
@@ -892,6 +1172,138 @@ class FYNDRLifeSimulator:
             json.dump(state, f, indent=2)
         
         print(f"Simulation state saved to {filename}")
+    
+    def run_analysis_on_completion(self):
+        """Run comprehensive analysis when simulation completes"""
+        if not self.config.auto_analyze_on_completion:
+            return
+            
+        print("\n" + "="*60)
+        print("RUNNING POST-SIMULATION ANALYSIS")
+        print("="*60)
+        
+        try:
+            # Import analysis tools
+            from analysis_tools import FYNDRAnalyzer
+            
+            # Create analyzer instance
+            analyzer = FYNDRAnalyzer()
+            
+            # Export simulation data to CSV files for analysis
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            daily_stats_file = f"analysis_daily_stats_{timestamp}.csv"
+            players_file = f"analysis_players_{timestamp}.csv"
+            stickers_file = f"analysis_stickers_{timestamp}.csv"
+            
+            # Export daily stats
+            with open(daily_stats_file, 'w', newline='') as f:
+                if self.daily_stats:
+                    writer = csv.DictWriter(f, fieldnames=asdict(self.daily_stats[0]).keys())
+                    writer.writeheader()
+                    for stats in self.daily_stats:
+                        writer.writerow(asdict(stats))
+            
+            # Export player data
+            with open(players_file, 'w', newline='') as f:
+                if self.players:
+                    # Get all player attributes
+                    sample_player = list(self.players.values())[0]
+                    fieldnames = list(asdict(sample_player).keys())
+                    # Convert sets to lists for CSV compatibility
+                    for field in fieldnames:
+                        if hasattr(sample_player, field):
+                            attr = getattr(sample_player, field)
+                            if isinstance(attr, set):
+                                fieldnames[fieldnames.index(field)] = f"{field}_list"
+                    
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for player in self.players.values():
+                        player_dict = asdict(player)
+                        # Convert sets to lists
+                        for key, value in player_dict.items():
+                            if isinstance(value, set):
+                                player_dict[f"{key}_list"] = list(value)
+                                del player_dict[key]
+                        writer.writerow(player_dict)
+            
+            # Export sticker data
+            with open(stickers_file, 'w', newline='') as f:
+                if self.stickers:
+                    sample_sticker = list(self.stickers.values())[0]
+                    fieldnames = list(asdict(sample_sticker).keys())
+                    # Convert sets to lists for CSV compatibility
+                    for field in fieldnames:
+                        if hasattr(sample_sticker, field):
+                            attr = getattr(sample_sticker, field)
+                            if isinstance(attr, set):
+                                fieldnames[fieldnames.index(field)] = f"{field}_list"
+                    
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for sticker in self.stickers.values():
+                        sticker_dict = asdict(sticker)
+                        # Convert sets to lists
+                        for key, value in sticker_dict.items():
+                            if isinstance(value, set):
+                                sticker_dict[f"{key}_list"] = list(value)
+                                del sticker_dict[key]
+                        writer.writerow(sticker_dict)
+            
+            # Load data into analyzer
+            analyzer.load_simulation_data(daily_stats_file, players_file, stickers_file)
+            
+            # Run comprehensive analysis
+            print("Analyzing economy health...")
+            economy_health = analyzer.analyze_economy_health()
+            
+            print("Analyzing player behavior...")
+            player_behavior = analyzer.analyze_player_behavior()
+            
+            print("Analyzing growth patterns...")
+            growth_analysis = analyzer.analyze_growth_patterns()
+            
+            # Generate comprehensive report
+            print("Generating analysis report...")
+            report = analyzer.generate_comprehensive_report()
+            
+            # Save analysis results
+            analysis_file = f"simulation_analysis_{timestamp}.json"
+            with open(analysis_file, 'w') as f:
+                json.dump({
+                    'economy_health': economy_health,
+                    'player_behavior': player_behavior,
+                    'growth_analysis': growth_analysis,
+                    'comprehensive_report': report,
+                    'simulation_config': asdict(self.config),
+                    'final_stats': asdict(self.daily_stats[-1]) if self.daily_stats else {}
+                }, f, indent=2)
+            
+            print(f"\nAnalysis completed! Results saved to:")
+            print(f"  - {analysis_file}")
+            print(f"  - {daily_stats_file}")
+            print(f"  - {players_file}")
+            print(f"  - {stickers_file}")
+            
+            # Print summary to console
+            print("\n" + "="*60)
+            print("ANALYSIS SUMMARY")
+            print("="*60)
+            print(f"Total Players: {len(self.players)}")
+            print(f"Total Revenue: ${self.total_revenue:.2f}")
+            print(f"Total Scans: {self.total_scans}")
+            print(f"Total Stickers: {len(self.stickers)}")
+            if self.daily_stats:
+                final_day = self.daily_stats[-1]
+                print(f"Final Day Active Players: {final_day.active_players}")
+                print(f"Retention Rate: {final_day.retention_rate:.1%}")
+                print(f"Growth Rate: {final_day.growth_rate:+.1%}")
+            
+        except ImportError:
+            print("Warning: analysis_tools module not found. Skipping analysis.")
+        except Exception as e:
+            print(f"Error during analysis: {e}")
+            print("Continuing without analysis...")
     
     def load_simulation_state(self, filename: str):
         """Load simulation state from file"""
@@ -949,8 +1361,6 @@ def load_config_from_okr_results(okr_file: str) -> LifeSimConfig:
         owner_base_points=multiplayer_config["owner_base_points"],
         scanner_base_points=multiplayer_config["scanner_base_points"],
         unique_scanner_bonus=multiplayer_config["unique_scanner_bonus"],
-        diminishing_threshold=multiplayer_config["diminishing_threshold"],
-        diminishing_rates=multiplayer_config["diminishing_rates"],
         geo_diversity_radius=multiplayer_config["geo_diversity_radius"],
         geo_diversity_bonus=multiplayer_config["geo_diversity_bonus"],
         venue_variety_bonus=multiplayer_config["venue_variety_bonus"],
@@ -1043,6 +1453,11 @@ def main():
     finally:
         # Save final state
         simulator.save_simulation_state()
+        
+        # Run analysis if enabled
+        if simulator.config.auto_analyze_on_completion:
+            simulator.run_analysis_on_completion()
+        
         print("Simulation completed")
 
 if __name__ == "__main__":
