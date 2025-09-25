@@ -54,7 +54,7 @@ class LifeSimConfig:
     auto_save_interval: int = 271  # Save every N days
     enable_visualization: bool = True
     enable_console_output: bool = True
-    auto_analyze_on_completion: bool = False  # Automatically run analysis when simulation completes
+    auto_analyze_on_completion: bool = True  # Automatically run analysis when simulation completes
     
     # === CORE SCORING PARAMETERS ===
     owner_base_points: float = 2.0
@@ -67,8 +67,8 @@ class LifeSimConfig:
     venue_variety_bonus: float = 2.5
     
     # === SOCIAL MECHANICS ===
-    social_sneeze_threshold: int = 3  # Scans needed to trigger sneeze mode
-    social_sneeze_bonus: float = 3.0  # Point multiplier during sneeze mode
+    social_sneeze_threshold: int = 5  # Scans needed to trigger sneeze mode
+    social_sneeze_bonus: float = 2.5  # Point multiplier during sneeze mode
     social_sneeze_duration_hours: float = 3.0  # How long sneeze mode lasts (hours)
     social_sneeze_cap: int = 1  # Maximum social sneeze bonuses per day (deprecated with sneeze mode)
     
@@ -91,6 +91,19 @@ class LifeSimConfig:
     locale_size_meters: float = 804.5  # Locale size in meters (804.5m square = 1 quarter sq mi)
     sticker_density_per_quarter_sq_mile: int = 500  # Average stickers per 0.25 sq mi
     
+    # === PLAYER MOVEMENT PATTERNS ===
+    enable_movement_patterns: bool = True  # Enable realistic player movement
+    max_scan_distance_meters: float = 100.0  # Maximum distance to scan stickers
+    travel_time_per_100m_minutes: float = 2.0  # Travel time per 100 meters (walking speed)
+    daily_routine_variance: float = 0.3  # Random variance in daily routines (30%)
+    
+    # === SOCIAL HUB MECHANICS ===
+    enable_social_hubs: bool = True  # Enable social hub mechanics
+    social_hub_radius_meters: float = 50.0  # Radius of social hub influence
+    social_hub_scan_bonus: float = 1.5  # Bonus multiplier for scanning in social hubs
+    social_hub_placement_bonus: float = 2.0  # Bonus multiplier for placing in social hubs
+    social_hub_attraction_radius: float = 200.0  # How far players are drawn to social hubs
+    
     # Player type scanning behavior (percentage of available stickers per day)
     whale_scan_percentage: float = 0.02  # 2% of available stickers per day
     grinder_scan_percentage: float = 0.40  # 40% of available stickers per day
@@ -99,10 +112,17 @@ class LifeSimConfig:
     # === STICKER DENSITY LIMITS ===
     sticker_placement_cooldown_days: int = 1  # Minimum days between sticker placements per player
     
+    # === REALISTIC DENSITY SIMULATION ===
+    enable_realistic_density: bool = True  # Enable area-specific density limits
+    campus_building_density: int = 1000  # High density in campus buildings
+    campus_quad_density: int = 200  # Medium density in open areas
+    campus_perimeter_density: int = 50  # Low density on campus edges
+    social_hub_density: int = 1500  # Very high density in social hubs
+    
     # === MONETIZATION ===
-    pack_price_points: int = 300
+    pack_price_points: int = 750
     pack_price_dollars: float = 3.0
-    points_per_dollar: float = 100.0
+    points_per_dollar: float = 250.0
     wallet_topup_min: float = 6.0
     wallet_topup_max: float = 60.0
     
@@ -152,7 +172,7 @@ class LifeSimConfig:
     event_bonus_multiplier: float = 1.5  # Point multiplier during events (applies to all scans)
     
     # === GROWTH PARAMETERS ===
-    new_player_daily_probability: float = 0.1  # 10% chance per day
+    new_player_daily_probability: float = 0.2  # 10% chance per day
     new_player_whale_probability: float = 0.02  # 3% of new players are whales
     new_player_grinder_probability: float = 0.18  # 17% of new players are grinders
     new_player_casual_probability: float = 0.80  # 80% of new players are casual
@@ -163,7 +183,7 @@ class LifeSimConfig:
     population_density_per_quarter_sq_mile: float = 4000.0  # Population density per quarter square mile
     
     # Viral spread mechanics
-    viral_spread_percentage: float = 0.20  # 20% of active players recruit new players
+    viral_spread_percentage: float = 0.40  # 20% of active players recruit new players
     viral_spread_frequency_min_days: int = 10  # Minimum days between viral spread events
     viral_spread_frequency_max_days: int = 18  # Maximum days between viral spread events
     viral_spread_cap_percentage: float = 0.40  # Maximum 40% of total population can be players
@@ -179,7 +199,7 @@ class LifeSimConfig:
     new_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
     
     # === STARTING POPULATION ===
-    starting_player_count: int = 1  # Number of players to start the simulation with
+    starting_player_count: int = 5  # Number of players to start the simulation with
     starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
     
     # === VENUE DIVERSITY ===
@@ -246,14 +266,31 @@ class Player:
     is_active: bool = True
     churn_day: Optional[int] = None
     
+    # === MOVEMENT PATTERN TRACKING ===
+    home_location: Tuple[float, float] = None  # Player's home/dorm location
+    work_location: Tuple[float, float] = None  # Class/office location
+    social_hubs: List[Tuple[float, float]] = None  # Favorite social locations
+    daily_routine: List[Tuple[float, float]] = None  # Daily commute path
+    current_location: Tuple[float, float] = None  # Current position
+    last_movement_time: float = 0.0  # Time of last movement (hours)
+    movement_speed: float = 1.0  # Player's movement speed multiplier
+    
     def __post_init__(self):
         if self.last_scan_times is None:
             self.last_scan_times = {}
         if self.favorite_venues is None:
             self.favorite_venues = []
+        if self.social_hubs is None:
+            self.social_hubs = []
+        if self.daily_routine is None:
+            self.daily_routine = []
         if self.location is None:
             # Random location in a 10km x 10km area
             self.location = (random.uniform(0, 0.1), random.uniform(0, 0.1))
+        if self.current_location is None:
+            self.current_location = self.location
+        if self.home_location is None:
+            self.home_location = self.location
 
 @dataclass
 class Sticker:
@@ -312,6 +349,11 @@ class DailyStats:
     # Social sneeze mode tracking
     stickers_in_sneeze_mode: int = 0
     sneeze_mode_hotspots: List[Tuple[float, float]] = None  # Locations of sneeze mode stickers
+    
+    # Social hub tracking
+    active_social_hubs: int = 0
+    social_hub_locations: List[Tuple[float, float]] = None  # Locations of active social hubs
+    players_in_social_hubs: int = 0  # Number of players currently in social hubs
 
 # ============================================================================
 # CORE SIMULATOR CLASS
@@ -351,6 +393,12 @@ class FYNDRLifeSimulator:
         self.max_stickers_allowed = self._calculate_max_stickers_allowed()
         self.player_last_sticker_day = {}  # Track when each player last placed a sticker
         
+        # Initialize social hubs first (needed for sticker creation)
+        if self.config.enable_social_hubs:
+            self._initialize_social_hubs()
+        else:
+            self.social_hubs = []  # Initialize as empty list if disabled
+        
         # Initialize with some starting players
         self._initialize_starting_population()
     
@@ -375,12 +423,28 @@ class FYNDRLifeSimulator:
                 weights=list(self.config.starting_player_type_ratios.values())
             )[0]
             
+            # Create player with movement patterns
+            home_location = (random.uniform(0, 0.1), random.uniform(0, 0.1))
+            work_location = (random.uniform(0, 0.1), random.uniform(0, 0.1))
+            
             player = Player(
                 id=self.next_player_id,
                 player_type=player_type,
                 join_day=0,
-                location=(random.uniform(0, 0.1), random.uniform(0, 0.1))
+                location=home_location,
+                home_location=home_location,
+                work_location=work_location,
+                current_location=home_location
             )
+            
+            # Set up social hubs for the player
+            if self.config.enable_social_hubs and hasattr(self, 'social_hubs'):
+                player.social_hubs = random.sample(self.social_hubs, min(3, len(self.social_hubs)))
+            
+            # Set up daily routine
+            if self.config.enable_movement_patterns:
+                player.daily_routine = [home_location, work_location] + player.social_hubs
+                player.last_movement_time = random.uniform(0, 24)  # Random start time
             
             # Give new players some starting points and free packs
             player.total_points = 100.0
@@ -422,14 +486,17 @@ class FYNDRLifeSimulator:
             weights=self.config.venue_type_weights
         )[0]
         
-        # Place sticker near owner's location
+        # Place sticker near owner's current location
         location = (
-            owner.location[0] + random.uniform(-0.01, 0.01),
-            owner.location[1] + random.uniform(-0.01, 0.01)
+            owner.current_location[0] + random.uniform(-0.01, 0.01),
+            owner.current_location[1] + random.uniform(-0.01, 0.01)
         )
         
-        # Check if we've reached the density limit (check right before creating)
-        if len(self.stickers) >= self.max_stickers_allowed:
+        # Check area-specific density limits
+        area_density_limit = self._get_area_density_limit(location)
+        nearby_stickers = self._count_stickers_in_area(location, 100)  # 100m radius
+        
+        if nearby_stickers >= area_density_limit:
             return False
         
         sticker = Sticker(
@@ -558,17 +625,32 @@ class FYNDRLifeSimulator:
             self.total_revenue += spend_amount
     
     def _simulate_scan_behavior(self, player: Player):
-        """Simulate a player scanning stickers"""
-        # Find available stickers (not on cooldown)
-        available_stickers = []
-        for sticker in self.stickers.values():
-            if not sticker.is_active:
-                continue
+        """Simulate a player scanning stickers with geographic constraints"""
+        # Update player movement first
+        current_time_hours = (self.current_day % 1) * 24
+        self._update_player_movement(player, current_time_hours)
+        
+        # Find available stickers within scanning distance
+        if self.config.enable_movement_patterns:
+            available_stickers = self._get_nearby_stickers(player)
+        else:
+            # Fallback to all stickers if movement patterns disabled
+            available_stickers = []
+            for sticker in self.stickers.values():
+                if not sticker.is_active:
+                    continue
+                available_stickers.append(sticker)
+        
+        # Filter by cooldown
+        filtered_stickers = []
+        for sticker in available_stickers:
             if sticker.id in player.last_scan_times:
                 days_since_scan = self.current_day - player.last_scan_times[sticker.id]
                 if days_since_scan < (self.config.sticker_scan_cooldown_hours / 24):
                     continue
-            available_stickers.append(sticker)
+            filtered_stickers.append(sticker)
+        
+        available_stickers = filtered_stickers
         
         if not available_stickers:
             return
@@ -629,6 +711,10 @@ class FYNDRLifeSimulator:
         social_bonus = self._calculate_social_bonus(player, sticker, current_time_hours)
         base_points *= social_bonus
         
+        # Apply social hub bonus
+        if self.config.enable_social_hubs and self._is_in_social_hub(sticker.location):
+            base_points *= self.config.social_hub_scan_bonus
+        
         # Apply event bonus
         if self.current_event:
             base_points *= self.config.event_bonus_multiplier
@@ -665,6 +751,10 @@ class FYNDRLifeSimulator:
         # Apply social sneeze bonus
         social_bonus = self._calculate_social_bonus(scanner, sticker, current_time_hours)
         base_points *= social_bonus
+        
+        # Apply social hub bonus
+        if self.config.enable_social_hubs and self._is_in_social_hub(sticker.location):
+            base_points *= self.config.social_hub_scan_bonus
         
         # Apply event bonus
         if self.current_event:
@@ -809,6 +899,153 @@ class FYNDRLifeSimulator:
         
         return areas
     
+    def _initialize_social_hubs(self):
+        """Initialize social hub locations on the campus"""
+        self.social_hubs = [
+            (0.05, 0.05),   # Central quad
+            (0.03, 0.07),   # Library
+            (0.07, 0.03),   # Student center
+            (0.02, 0.02),   # Cafeteria
+            (0.08, 0.08),   # Gym
+        ]
+    
+    def _calculate_distance_meters(self, loc1: Tuple[float, float], loc2: Tuple[float, float]) -> float:
+        """Calculate distance between two locations in meters"""
+        distance_degrees = math.sqrt(
+            (loc1[0] - loc2[0])**2 + (loc1[1] - loc2[1])**2
+        )
+        return distance_degrees * 111000  # Convert degrees to meters (rough approximation)
+    
+    def _is_in_social_hub(self, location: Tuple[float, float]) -> bool:
+        """Check if a location is within a social hub"""
+        if not self.config.enable_social_hubs or not hasattr(self, 'social_hubs') or not self.social_hubs:
+            return False
+        
+        for hub_location in self.social_hubs:
+            distance = self._calculate_distance_meters(location, hub_location)
+            if distance <= self.config.social_hub_radius_meters:
+                return True
+        return False
+    
+    def _get_area_density_limit(self, location: Tuple[float, float]) -> int:
+        """Get the density limit for a specific area"""
+        if not self.config.enable_realistic_density:
+            return self.max_stickers_allowed
+        
+        if self._is_in_social_hub(location):
+            return self.config.social_hub_density
+        elif self._is_in_campus_building(location):
+            return self.config.campus_building_density
+        elif self._is_in_campus_quad(location):
+            return self.config.campus_quad_density
+        else:
+            return self.config.campus_perimeter_density
+    
+    def _is_in_campus_building(self, location: Tuple[float, float]) -> bool:
+        """Check if location is in a campus building (simplified)"""
+        # Simplified: buildings are in the center area
+        center_x, center_y = 0.05, 0.05
+        distance = self._calculate_distance_meters(location, (center_x, center_y))
+        return distance <= 200  # Within 200m of center
+    
+    def _is_in_campus_quad(self, location: Tuple[float, float]) -> bool:
+        """Check if location is in the campus quad (open area)"""
+        # Simplified: quad is the main open area
+        center_x, center_y = 0.05, 0.05
+        distance = self._calculate_distance_meters(location, (center_x, center_y))
+        return 200 < distance <= 400  # Between 200m and 400m from center
+    
+    def _update_player_movement(self, player: Player, current_time_hours: float):
+        """Update player's location based on movement patterns"""
+        if not self.config.enable_movement_patterns:
+            return
+        
+        # Calculate time since last movement
+        time_since_movement = current_time_hours - player.last_movement_time
+        
+        # Determine if player should move (based on daily routine)
+        should_move = self._should_player_move(player, current_time_hours)
+        
+        if should_move:
+            # Calculate new location based on routine
+            new_location = self._calculate_next_location(player, current_time_hours)
+            
+            # Check if movement is possible (travel time constraints)
+            if new_location != player.current_location:
+                travel_distance = self._calculate_distance_meters(player.current_location, new_location)
+                travel_time_hours = (travel_distance / 100) * (self.config.travel_time_per_100m_minutes / 60)
+                
+                if time_since_movement >= travel_time_hours:
+                    player.current_location = new_location
+                    player.last_movement_time = current_time_hours
+    
+    def _should_player_move(self, player: Player, current_time_hours: float) -> bool:
+        """Determine if player should move based on daily routine"""
+        # Simplified: players move every 2-4 hours with some randomness
+        time_since_movement = current_time_hours - player.last_movement_time
+        base_movement_interval = 3.0  # 3 hours
+        
+        # Add variance based on player type
+        if player.player_type == "grinder":
+            base_movement_interval *= 0.8  # Grinders move more frequently
+        elif player.player_type == "casual":
+            base_movement_interval *= 1.5  # Casuals move less frequently
+        
+        # Add random variance
+        variance = random.uniform(0.5, 1.5)
+        movement_interval = base_movement_interval * variance
+        
+        return time_since_movement >= movement_interval
+    
+    def _calculate_next_location(self, player: Player, current_time_hours: float) -> Tuple[float, float]:
+        """Calculate player's next location based on routine and social hub attraction"""
+        # Base routine: alternate between home, work, and social hubs
+        routine_locations = [player.home_location, player.work_location] + player.social_hubs
+        
+        if not routine_locations:
+            return player.current_location
+        
+        # Choose next location based on time of day and social hub attraction
+        if current_time_hours < 8 or current_time_hours > 22:  # Night time - go home
+            return player.home_location
+        elif 8 <= current_time_hours < 17:  # Day time - go to work
+            return player.work_location
+        else:  # Evening - social hubs
+            # Check for nearby social hubs with sneeze mode stickers
+            sneeze_stickers = self.get_sneeze_mode_stickers(current_time_hours)
+            for sticker in sneeze_stickers:
+                for hub in player.social_hubs:
+                    if self._calculate_distance_meters(sticker.location, hub) <= self.config.social_hub_attraction_radius:
+                        return hub  # Attracted to social hub with viral stickers
+            
+            # Default to random social hub
+            return random.choice(player.social_hubs) if player.social_hubs else player.home_location
+    
+    def _get_nearby_stickers(self, player: Player) -> List[Sticker]:
+        """Get stickers within scanning distance of player"""
+        nearby_stickers = []
+        for sticker in self.stickers.values():
+            if not sticker.is_active:
+                continue
+            
+            distance = self._calculate_distance_meters(player.current_location, sticker.location)
+            if distance <= self.config.max_scan_distance_meters:
+                nearby_stickers.append(sticker)
+        
+        return nearby_stickers
+    
+    def _count_stickers_in_area(self, location: Tuple[float, float], radius_meters: float) -> int:
+        """Count stickers within a specific area"""
+        count = 0
+        for sticker in self.stickers.values():
+            if not sticker.is_active:
+                continue
+            
+            distance = self._calculate_distance_meters(location, sticker.location)
+            if distance <= radius_meters:
+                count += 1
+        return count
+    
     def get_sneeze_mode_stickers(self, current_time_hours: float) -> List[Sticker]:
         """Get all stickers currently in sneeze mode (for hotspot tracking)"""
         sneeze_stickers = []
@@ -864,27 +1101,10 @@ class FYNDRLifeSimulator:
             # Use new population-based growth mechanics
             
             # 1. Viral spread mechanics (20% of active players recruit new players with random frequency)
-            # Check if it's time for viral spread (random interval between min and max days)
-            if hasattr(self, 'last_viral_spread_day'):
-                days_since_last_viral = self.current_day - self.last_viral_spread_day
-                min_days = self.config.viral_spread_frequency_min_days
-                max_days = self.config.viral_spread_frequency_max_days
-                if days_since_last_viral >= min_days and (days_since_last_viral >= max_days or random.random() < 0.3):
-                    # Trigger viral spread
-                    pass
-                else:
-                    # Not time for viral spread yet
-                    pass
-            else:
-                # First viral spread check - use random timing
-                if random.random() < 0.1:  # 10% chance on any given day initially
-                    pass
-                else:
-                    pass
             
             # Check if we should trigger viral spread
             should_trigger_viral = False
-            if not hasattr(self, 'last_viral_spread_day'):
+            if self.last_viral_spread_day is None:
                 # First time - random chance
                 should_trigger_viral = random.random() < 0.1
             else:
@@ -1013,6 +1233,24 @@ class FYNDRLifeSimulator:
         sneeze_stickers = self.get_sneeze_mode_stickers(current_time_hours)
         sneeze_hotspots = [sticker.location for sticker in sneeze_stickers]
         
+        # Calculate social hub statistics
+        active_social_hubs = 0
+        social_hub_locations = []
+        players_in_social_hubs = 0
+        
+        if self.config.enable_social_hubs and hasattr(self, 'social_hubs') and self.social_hubs:
+            for hub_location in self.social_hubs:
+                # Check if hub has any stickers
+                hub_stickers = self._count_stickers_in_area(hub_location, self.config.social_hub_radius_meters)
+                if hub_stickers > 0:
+                    active_social_hubs += 1
+                    social_hub_locations.append(hub_location)
+                
+                # Count players in this hub
+                for player in active_players:
+                    if self._calculate_distance_meters(player.current_location, hub_location) <= self.config.social_hub_radius_meters:
+                        players_in_social_hubs += 1
+        
         return DailyStats(
             day=self.current_day,
             total_players=len(active_players),
@@ -1045,7 +1283,12 @@ class FYNDRLifeSimulator:
             
             # === SOCIAL SNEEZE MODE METRICS ===
             stickers_in_sneeze_mode=len(sneeze_stickers),
-            sneeze_mode_hotspots=sneeze_hotspots
+            sneeze_mode_hotspots=sneeze_hotspots,
+            
+            # === SOCIAL HUB METRICS ===
+            active_social_hubs=active_social_hubs,
+            social_hub_locations=social_hub_locations,
+            players_in_social_hubs=players_in_social_hubs
         )
     
     def run_day(self):
@@ -1124,13 +1367,14 @@ class FYNDRLifeSimulator:
     def _print_daily_summary(self, stats: DailyStats):
         """Print daily summary to console"""
         sneeze_info = f" | Sneeze: {stats.stickers_in_sneeze_mode}" if stats.stickers_in_sneeze_mode > 0 else ""
+        hub_info = f" | Hubs: {stats.active_social_hubs}" if stats.active_social_hubs > 0 else ""
         print(f"Day {stats.day:3d} | "
               f"Players: {stats.active_players:4d} | "
               f"Revenue: ${stats.total_revenue:8.2f} | "
               f"Scans: {stats.total_scans:5d} | "
               f"Stickers: {stats.total_stickers_placed:4d} | "
               f"Retention: {stats.retention_rate:.1%} | "
-              f"Growth: {stats.growth_rate:+.1%}{sneeze_info}")
+              f"Growth: {stats.growth_rate:+.1%}{sneeze_info}{hub_info}")
     
     def save_simulation_state(self, filename: str = None):
         """Save current simulation state to file"""
