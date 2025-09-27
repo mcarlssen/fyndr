@@ -27,6 +27,7 @@ import argparse
 import threading
 import signal
 import sys
+import os
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime, timedelta
@@ -50,14 +51,27 @@ class LifeSimConfig:
     # === SIMULATION CONTROL ===
     simulation_name: str = "FYNDR Life Sim - Population Mechanics"
     max_days: int = 270  # 0 = run indefinitely
-    real_time_speed: float = 100  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
-    auto_save_interval: int = 271  # Save every N days
+    real_time_speed: float = 1000  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
+    auto_save_interval: int = 2000  # Save every N days
     enable_visualization: bool = True
     enable_console_output: bool = True
     auto_analyze_on_completion: bool = True  # Automatically run analysis when simulation completes
     
+    # === CURRENT POINT CALCULATION ORDER ===
+    # Base points
+    # Level multiplier
+    # Diversity bonus
+    # Social sneeze bonus
+    # Social hub bonus
+    # Event bonus
+    # New player bonus
+    # Streak bonus
+    # Comeback bonus
+    # Referral bonus (2x for 14 days)
+    # Referral bonus (2x for 14 days)
+
     # === CORE SCORING PARAMETERS ===
-    owner_base_points: float = 2.0
+    owner_base_points: float = 3.0
     scanner_base_points: float = 1.0
     unique_scanner_bonus: float = 1.0
     
@@ -73,7 +87,7 @@ class LifeSimConfig:
     social_sneeze_cap: int = 1  # Maximum social sneeze bonuses per day (deprecated with sneeze mode)
     
     # === LEVELING SYSTEM ===
-    points_per_level: int = 200
+    points_per_level: int = 100
     max_level: int = 200
     
     # === LINEAR PROGRESSION SYSTEM ===
@@ -93,14 +107,14 @@ class LifeSimConfig:
     
     # === PLAYER MOVEMENT PATTERNS ===
     enable_movement_patterns: bool = True  # Enable realistic player movement
-    max_scan_distance_meters: float = 100.0  # Maximum distance to scan stickers
+    max_scan_distance_meters: float = 300.0  # Maximum distance to scan stickers
     travel_time_per_100m_minutes: float = 2.0  # Travel time per 100 meters (walking speed)
     daily_routine_variance: float = 0.3  # Random variance in daily routines (30%)
     
     # === SOCIAL HUB MECHANICS ===
     enable_social_hubs: bool = True  # Enable social hub mechanics
     social_hub_radius_meters: float = 50.0  # Radius of social hub influence
-    social_hub_scan_bonus: float = 1.5  # Bonus multiplier for scanning in social hubs
+    social_hub_scan_bonus: float = 2.5  # Bonus multiplier for scanning in social hubs
     social_hub_placement_bonus: float = 2.0  # Bonus multiplier for placing in social hubs
     social_hub_attraction_radius: float = 200.0  # How far players are drawn to social hubs
     
@@ -127,80 +141,97 @@ class LifeSimConfig:
     wallet_topup_max: float = 60.0
     
     # === PURCHASING BEHAVIOR ===
-    # Whale purchasing behavior
-    whale_purchase_probability: float = 0.083  # 8% chance to spend money daily
+    # Whale purchasing behavior (monthly rates converted to daily)
+    whale_purchase_probability: float = 0.0027  # 2.7% monthly = 0.09% daily (2-4 purchases/month)
     whale_purchase_min: float = 3.0  # Minimum purchase amount
-    whale_purchase_max: float = 9.0  # Maximum purchase amount
+    whale_purchase_max: float = 30.0  # Maximum purchase amount
+    
+    # Grinder purchasing behavior (1/4 whale rate + point reinvestment)
+    grinder_purchase_probability: float = 0.0007  # 0.7% monthly = 0.023% daily (0.5-1% monthly)
+    grinder_purchase_min: float = 3.0  # Minimum purchase amount
+    grinder_purchase_max: float = 9.0  # Maximum purchase amount
+    grinder_reinvest_on_levelup: bool = True  # Grinders reinvest all points when leveling up
+    grinder_reinvest_percentage: float = 1.0  # 100% of points reinvested on level up
     
     # Casual purchasing behavior  
     casual_purchase_probability: float = 0.00033  # 1% chance per month to spend money
     casual_purchase_min: float = 3.0  # Minimum purchase amount
     casual_purchase_max: float = 3.0  # Maximum purchase amount
     
-    # Grinder purchasing behavior (points-based, level-up triggered)
-    grinder_reinvest_on_levelup: bool = True  # Grinders reinvest all points when leveling up
-    grinder_reinvest_percentage: float = 1.0  # 100% of points reinvested on level up
-    
     # === SCANNING MECHANICS ===
     sticker_scan_cooldown_hours: int = 11
     
-    # === CHURN AND RETENTION ===
-    churn_probability_base: float = 0.001
-    churn_probability_whale: float = 0.0005
-    churn_probability_grinder: float = 0.0008
-    churn_probability_casual: float = 0.002
-    
     # === BONUS SYSTEMS ===
-    # Streak bonus: Rewards consecutive daily activity (no cooldown, resets if inactive)
-    streak_bonus_days: int = 7  # Days of consecutive activity needed
-    streak_bonus_multiplier: float = 1.5  # Point multiplier during streak
+    # Streak bonuses: Rewards consecutive daily activity (no cooldown, resets if inactive)
+    streak_bonus_days: int = 21  # Days of consecutive activity needed (legacy)
+    streak_bonus_multiplier: float = 3  # Point multiplier during streak (legacy)
+    
+    # Separate streak bonuses for different activities
+    scan_streak_bonus_days: int = 7  # Days of consecutive scanning needed
+    scan_streak_bonus_multiplier: float = 2.0  # Point multiplier for scanning streak
+    
+    placement_streak_bonus_days: int = 14  # Days of consecutive placement needed  
+    placement_streak_bonus_multiplier: float = 2  # Point multiplier for placement streak
+    
+    # Combined activity streak (scanning OR placing)
+    activity_streak_bonus_days: int = 21  # Days of any activity needed
+    activity_streak_bonus_multiplier: float = 2.0  # Point multiplier for activity streak
     
     # Comeback bonus: Rewards players returning after absence (no cooldown, triggers once per return)
     comeback_bonus_days: int = 3  # Days away needed to trigger comeback bonus
     comeback_bonus_multiplier: float = 2.0  # Point multiplier for comeback
+
+     # === EVENTS ===
+    # Seasonal/special events: Randomly triggered events that boost all point earnings
+    event_frequency_days: int = 21  # Average days between events (randomly triggered)
+    event_duration_days: int = 7  # How long events last once triggered
+    event_bonus_multiplier: float = 1.5  # Point multiplier during events (applies to all scans)
     
     # === NEW PLAYER ONBOARDING ===
     # New player bonus: Boosts new players for their first week (no cooldown, one-time per player)
     new_player_bonus_days: int = 7  # Days of bonus for new players
-    new_player_bonus_multiplier: float = 2.0  # Point multiplier for new players
+    new_player_bonus_multiplier: float = 3.0  # Point multiplier for new players
     new_player_free_packs: int = 0  # Free sticker packs for new players
     
-    # === EVENTS ===
-    # Seasonal/special events: Randomly triggered events that boost all point earnings
-    event_frequency_days: int = 30  # Average days between events (randomly triggered)
-    event_duration_days: int = 7  # How long events last once triggered
-    event_bonus_multiplier: float = 1.5  # Point multiplier during events (applies to all scans)
+    # === REFERRAL REWARD SYSTEM ===
+    # Referral rewards: Players who refer others get bonuses
+    referral_reward_multiplier: float = 4.0  # Point multiplier for referrers
+    referral_reward_days: int = 7  # Days of bonus for successful referrers
+
+    # === CHURN AND RETENTION ===
+    # Time-based churn curves (replaces flat rates with realistic industry benchmarks)
+    # Format: {player_type: {time_period: daily_churn_rate}}
+    churn_curves: Dict[str, Dict[str, float]] = None  # Will be set in __post_init__
     
-    # === GROWTH PARAMETERS ===
-    new_player_daily_probability: float = 0.2  # 10% chance per day
-    new_player_whale_probability: float = 0.02  # 3% of new players are whales
-    new_player_grinder_probability: float = 0.18  # 17% of new players are grinders
-    new_player_casual_probability: float = 0.80  # 80% of new players are casual
+    # === COMEBACK MECHANICS ===
+    comeback_cooldown_days: int = 180  # 6 months cooldown before comeback is possible
+    comeback_probability: float = 0.01  # 1% chance per day for churned players to return
+    comeback_bonus_points: float = 500.0  # Bonus points for returning players
     
     # === POPULATION & SPREAD MECHANICS ===
     # Population variables for modeling game spread in a locale
     total_population: int = 2500  # Total population of the area
     population_density_per_quarter_sq_mile: float = 4000.0  # Population density per quarter square mile
+
+    # Player type distribution for new players (overrides individual probabilities when enabled)
+    use_population_mechanics: bool = True  # Enable/disable population-based growth
+    new_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
+    
+    # === STARTING POPULATION ===
+    starting_player_count: int = 20  # Number of players to start the simulation with
+    starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
     
     # Viral spread mechanics
-    viral_spread_percentage: float = 0.40  # 20% of active players recruit new players
-    viral_spread_frequency_min_days: int = 10  # Minimum days between viral spread events
-    viral_spread_frequency_max_days: int = 18  # Maximum days between viral spread events
+    viral_spread_percentage: float = 1.2  # avg .06 to 1.2% of active players recruit new players
+    viral_spread_frequency_min_days: int = 14  # Minimum days between viral spread events
+    viral_spread_frequency_max_days: int = 42  # Maximum days between viral spread events
     viral_spread_cap_percentage: float = 0.40  # Maximum 40% of total population can be players
     
     # Organic growth mechanics
     organic_growth_rate_min: float = 0.002  # 0.2% minimum organic growth per 50 tags per week
     organic_growth_rate_max: float = 0.005  # 0.5% maximum organic growth per 50 tags per week
     organic_growth_tags_threshold: int = 50  # Number of tags required for organic growth calculation
-    organic_growth_area_radius_meters: float = 20.0  # Radius in meters for area-bounded organic growth
-    
-    # Player type distribution for new players (overrides individual probabilities when enabled)
-    use_population_mechanics: bool = True  # Enable/disable population-based growth
-    new_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
-    
-    # === STARTING POPULATION ===
-    starting_player_count: int = 5  # Number of players to start the simulation with
-    starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
+    organic_growth_area_radius_meters: float = 50.0  # Radius in meters for area-bounded organic growth
     
     # === VENUE DIVERSITY ===
     venue_types: List[str] = None  # ["restaurant", "cafe", "shop", "park", "school"]
@@ -226,6 +257,29 @@ class LifeSimConfig:
             }
         if self.level_xp_thresholds is None:
             self.level_xp_thresholds = self._calculate_xp_thresholds()
+        
+        # Initialize realistic time-based churn curves based on industry benchmarks
+        if self.churn_curves is None:
+            self.churn_curves = {
+                "casual": {
+                    "day_1_3": 0.15,    # 15% daily churn (high initial drop-off)
+                    "day_4_7": 0.08,    # 8% daily churn (stabilizing)
+                    "day_8_30": 0.05,   # 5% daily churn (more realistic long-term)
+                    "day_31_plus": 0.04 # 4% daily churn (mature players)
+                },
+                "grinder": {
+                    "day_1_3": 0.10,    # 10% daily churn (better initial retention)
+                    "day_4_7": 0.05,    # 5% daily churn
+                    "day_8_30": 0.03,   # 3% daily churn (more realistic long-term)
+                    "day_31_plus": 0.025 # 2.5% daily churn (very engaged)
+                },
+                "whale": {
+                    "day_1_3": 0.06,    # 6% daily churn (best initial retention)
+                    "day_4_7": 0.03,    # 3% daily churn
+                    "day_8_30": 0.015,  # 1.5% daily churn (excellent long-term)
+                    "day_31_plus": 0.01 # 1% daily churn (highly engaged)
+                }
+            }
     
     def _calculate_xp_thresholds(self) -> List[int]:
         """Calculate XP thresholds for linear progression curve"""
@@ -258,7 +312,15 @@ class Player:
     stickers_scanned: int = 0
     days_active: int = 0
     days_since_last_scan: int = 0
-    streak_days: int = 0
+    days_since_last_placement: int = 0
+    
+    # === STREAK TRACKING ===
+    streak_days: int = 0  # Legacy - total activity streak
+    scan_streak_days: int = 0  # Consecutive days of scanning
+    placement_streak_days: int = 0  # Consecutive days of placing stickers
+    last_activity_day: int = 0  # Last day player was active (scanned OR placed)
+    scanned_today: bool = False  # Did player scan today?
+    placed_today: bool = False  # Did player place a sticker today?
     last_scan_times: Dict[int, int] = None  # sticker_id -> day
     favorite_venues: List[str] = None
     location: Tuple[float, float] = None  # (lat, lng)
@@ -274,6 +336,16 @@ class Player:
     current_location: Tuple[float, float] = None  # Current position
     last_movement_time: float = 0.0  # Time of last movement (hours)
     movement_speed: float = 1.0  # Player's movement speed multiplier
+    
+    # === REFERRAL TRACKING ===
+    referred_by: Optional[int] = None  # ID of player who referred this player
+    referrals_made: int = 0  # Number of successful referrals made
+    referral_bonus_remaining: int = 0  # Days of referral bonus remaining
+    
+    # === COMEBACK TRACKING ===
+    churn_day: Optional[int] = None  # Day when player churned
+    comeback_eligible_day: Optional[int] = None  # Day when player becomes eligible for comeback
+    has_received_comeback_bonus: bool = False  # Whether player has received comeback bonus
     
     def __post_init__(self):
         if self.last_scan_times is None:
@@ -315,6 +387,22 @@ class Sticker:
             self.unique_scanners = set()
 
 @dataclass
+class GameEvent:
+    """Represents a game event that occurred"""
+    day: int
+    event_type: str  # 'seasonal_event', 'viral_spread', 'organic_growth', 'sneeze_mode', 'level_up', 'purchase', 'churn'
+    description: str
+    affected_players: int = 0
+    affected_stickers: int = 0
+    bonus_multiplier: float = 1.0
+    additional_data: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        if self.additional_data is None:
+            self.additional_data = {}
+
+
+@dataclass
 class DailyStats:
     """Daily statistics for the simulation"""
     day: int
@@ -354,6 +442,26 @@ class DailyStats:
     active_social_hubs: int = 0
     social_hub_locations: List[Tuple[float, float]] = None  # Locations of active social hubs
     players_in_social_hubs: int = 0  # Number of players currently in social hubs
+    
+    # === EVENT TRACKING ===
+    events_today: List[GameEvent] = None  # Events that occurred today
+    active_events: List[str] = None  # Currently active event types
+    event_impacts: Dict[str, float] = None  # Impact of events on metrics
+    
+    # === COMEBACK TRACKING ===
+    comeback_players_today: int = 0  # Number of players who returned today
+    
+    def __post_init__(self):
+        if self.sneeze_mode_hotspots is None:
+            self.sneeze_mode_hotspots = []
+        if self.social_hub_locations is None:
+            self.social_hub_locations = []
+        if self.events_today is None:
+            self.events_today = []
+        if self.active_events is None:
+            self.active_events = []
+        if self.event_impacts is None:
+            self.event_impacts = {}
 
 # ============================================================================
 # CORE SIMULATOR CLASS
@@ -382,6 +490,11 @@ class FYNDRLifeSimulator:
         # Event tracking
         self.current_event = None
         self.event_start_day = None
+        self.game_events: List[GameEvent] = []  # All events that have occurred
+        self.events_today: List[GameEvent] = []  # Events that occurred today
+        
+        # Comeback tracking
+        self.comeback_players_today = 0
         
         # === POPULATION & SPREAD TRACKING ===
         self.viral_recruits_today = 0
@@ -499,12 +612,15 @@ class FYNDRLifeSimulator:
         if nearby_stickers >= area_density_limit:
             return False
         
+        # Calculate placement streak bonus for the owner
+        placement_bonus = self._calculate_placement_streak_bonus(owner)
+        
         sticker = Sticker(
             id=self.next_sticker_id,
             owner_id=owner.id,
             venue_type=venue_type,
             location=location,
-            points_value=self.config.owner_base_points,
+            points_value=self.config.owner_base_points * placement_bonus,
             creation_day=self.current_day
         )
         
@@ -535,17 +651,21 @@ class FYNDRLifeSimulator:
         if self._check_player_churn(player):
             player.is_active = False
             player.churn_day = self.current_day
+            player.comeback_eligible_day = self.current_day + self.config.comeback_cooldown_days
             return
         
         # Update player stats
         player.days_active += 1
         player.days_since_last_scan += 1
+        player.days_since_last_placement += 1
         
-        # Check for streak bonus
-        if player.days_since_last_scan == 0:  # Player scanned today
-            player.streak_days += 1
-        else:
-            player.streak_days = 0
+        # Decay referral bonus
+        if player.referral_bonus_remaining > 0:
+            player.referral_bonus_remaining -= 1
+        
+        # Track daily activity for streak calculation
+        player.scanned_today = False
+        player.placed_today = False
         
         # Simulate player actions based on type
         if player.player_type == "whale":
@@ -554,28 +674,178 @@ class FYNDRLifeSimulator:
             self._simulate_grinder_behavior(player)
         else:  # casual
             self._simulate_casual_behavior(player)
+        
+        # Update streaks based on today's activity
+        self._update_player_streaks(player)
     
     def _check_player_churn(self, player: Player) -> bool:
-        """Check if a player should churn based on their type and activity"""
-        base_churn = self.config.churn_probability_base
+        """Check if a player should churn based on time-based churn curves and activity"""
+        # Calculate days since player joined
+        days_since_install = self.current_day - player.join_day
         
-        if player.player_type == "whale":
-            churn_prob = self.config.churn_probability_whale
-        elif player.player_type == "grinder":
-            churn_prob = self.config.churn_probability_grinder
-        else:  # casual
-            churn_prob = self.config.churn_probability_casual
+        # Get base churn rate from time-based curves
+        churn_curves = self.config.churn_curves[player.player_type]
         
-        # Increase churn probability if player hasn't been active
-        if player.days_since_last_scan > 7:
-            churn_prob *= 2.0
-        if player.days_since_last_scan > 14:
-            churn_prob *= 3.0
-            
+        if days_since_install <= 3:
+            base_churn = churn_curves["day_1_3"]
+        elif days_since_install <= 7:
+            base_churn = churn_curves["day_4_7"]
+        elif days_since_install <= 30:
+            base_churn = churn_curves["day_8_30"]
+        else:
+            base_churn = churn_curves["day_31_plus"]
+        
+        # Apply activity-based modifiers
+        churn_prob = self._apply_activity_churn_modifiers(base_churn, player)
+        
         return random.random() < churn_prob
     
+    def _apply_activity_churn_modifiers(self, base_churn: float, player: Player) -> float:
+        """Apply activity-based modifiers to churn probability"""
+        churn_prob = base_churn
+        
+        # Increase churn if player hasn't been active recently
+        if player.days_since_last_scan > 14:
+            churn_prob *= 4.0  # 4x churn if inactive > 14 days
+        elif player.days_since_last_scan > 7:
+            churn_prob *= 2.5  # 2.5x churn if inactive > 7 days
+        elif player.days_since_last_scan > 3:
+            churn_prob *= 1.5  # 1.5x churn if inactive > 3 days
+        
+        # Reduce churn for highly engaged players
+        if player.streak_days >= 14:
+            churn_prob *= 0.3  # 70% reduction for 14+ day streaks
+        elif player.streak_days >= 7:
+            churn_prob *= 0.5  # 50% reduction for 7+ day streaks
+        elif player.streak_days >= 3:
+            churn_prob *= 0.8  # 20% reduction for 3+ day streaks
+        
+        # Reduce churn for players who have made purchases (investment)
+        if player.total_spent > 0:
+            churn_prob *= 0.7  # 30% reduction for paying players
+        
+        # Reduce churn for high-level players (investment in progression)
+        if player.level >= 10:
+            churn_prob *= 0.6  # 40% reduction for level 10+ players
+        elif player.level >= 5:
+            churn_prob *= 0.8  # 20% reduction for level 5+ players
+        
+        return churn_prob
+    
+    def _calculate_placement_streak_bonus(self, player: Player) -> float:
+        """Calculate placement streak bonus for sticker creation"""
+        bonus = 1.0
+        
+        # Apply placement streak bonus
+        if player.placement_streak_days >= self.config.placement_streak_bonus_days:
+            bonus *= self.config.placement_streak_bonus_multiplier
+        
+        # Apply activity streak bonus
+        if player.streak_days >= self.config.activity_streak_bonus_days:
+            bonus *= self.config.activity_streak_bonus_multiplier
+        
+        return bonus
+    
+    def _update_player_streaks(self, player: Player):
+        """Update player streaks based on today's activity"""
+        # Update scan streak
+        if player.scanned_today:
+            player.scan_streak_days += 1
+            player.days_since_last_scan = 0
+        else:
+            player.scan_streak_days = 0
+        
+        # Update placement streak  
+        if player.placed_today:
+            player.placement_streak_days += 1
+            player.days_since_last_placement = 0
+        else:
+            player.placement_streak_days = 0
+        
+        # Update overall activity streak (scanning OR placing)
+        if player.scanned_today or player.placed_today:
+            player.streak_days += 1
+            player.last_activity_day = self.current_day
+        else:
+            player.streak_days = 0
+        
+        # Add realistic streak variability (occasional breaks)
+        self._apply_streak_variability(player)
+    
+    def _apply_streak_variability(self, player: Player):
+        """Apply realistic streak variability with occasional breaks"""
+        # 5% chance to break a streak even if active (realistic life events)
+        if random.random() < 0.05 and (player.scan_streak_days > 0 or player.placement_streak_days > 0):
+            if random.random() < 0.5:
+                player.scan_streak_days = 0
+            else:
+                player.placement_streak_days = 0
+        
+        # 2% chance to break overall activity streak
+        if random.random() < 0.02 and player.streak_days > 0:
+            player.streak_days = 0
+    
+    def get_churn_statistics(self) -> Dict[str, Any]:
+        """Calculate churn statistics for analysis"""
+        if not self.players:
+            return {}
+        
+        # Calculate retention rates by day
+        retention_by_day = {}
+        for day in range(1, min(31, self.current_day + 1)):
+            players_at_start = sum(1 for p in self.players.values() if p.join_day <= self.current_day - day)
+            players_remaining = sum(1 for p in self.players.values() 
+                                 if p.join_day <= self.current_day - day and p.is_active)
+            
+            if players_at_start > 0:
+                retention_rate = players_remaining / players_at_start
+                retention_by_day[day] = retention_rate
+        
+        # Calculate churn rates by player type
+        churn_by_type = {}
+        for player_type in ["casual", "grinder", "whale"]:
+            type_players = [p for p in self.players.values() if p.player_type == player_type]
+            if type_players:
+                churned = sum(1 for p in type_players if not p.is_active)
+                total = len(type_players)
+                churn_by_type[player_type] = {
+                    "total": total,
+                    "churned": churned,
+                    "churn_rate": churned / total if total > 0 else 0
+                }
+        
+        return {
+            "retention_by_day": retention_by_day,
+            "churn_by_type": churn_by_type,
+            "current_day": self.current_day
+        }
+    
+    def print_churn_analysis(self):
+        """Print detailed churn analysis to console"""
+        stats = self.get_churn_statistics()
+        
+        print("\n" + "="*60)
+        print("CHURN ANALYSIS - Time-Based Curves")
+        print("="*60)
+        
+        # Show retention rates for key days
+        key_days = [1, 3, 7, 14, 30]
+        print("\nRetention Rates by Day:")
+        for day in key_days:
+            if day in stats["retention_by_day"]:
+                retention = stats["retention_by_day"][day]
+                churn = (1 - retention) * 100
+                print(f"  Day {day:2d}: {retention:.1%} retained ({churn:.1f}% churned)")
+        
+        # Show churn by player type
+        print("\nChurn by Player Type:")
+        for player_type, data in stats["churn_by_type"].items():
+            print(f"  {player_type.capitalize():8s}: {data['churn_rate']:.1%} churn rate ({data['churned']}/{data['total']} players)")
+        
+        print("="*60)
+    
     def _simulate_whale_behavior(self, player: Player):
-        """Simulate whale player behavior"""
+        """Simulate whale player behavior - focused on owning stickers, not scanning"""
         # Whales are more likely to spend money
         if random.random() < self.config.whale_purchase_probability:
             spend_amount = random.uniform(
@@ -586,33 +856,48 @@ class FYNDRLifeSimulator:
             player.total_spent += spend_amount
             self.total_revenue += spend_amount
         
-        # Whales place more stickers
-        if random.random() < 0.8:  # 80% chance to place sticker
+        # Whales focus on PLACING stickers (farming points through ownership)
+        if random.random() < 0.9:  # 90% chance to place sticker (high priority)
             self._create_new_sticker(player)
+            player.placed_today = True
         
-        # Whales scan more frequently
-        if random.random() < 0.9:  # 90% chance to scan
+        # Whales scan less frequently (not their focus)
+        if random.random() < 0.3:  # 30% chance to scan (low priority)
             self._simulate_scan_behavior(player)
+            player.scanned_today = True
     
     def _simulate_grinder_behavior(self, player: Player):
-        """Simulate grinder player behavior"""
-        # Grinders don't make daily purchases - they reinvest points on level up
-        # This is handled in the _check_level_up method
+        """Simulate grinder player behavior - focused on economy wins via streaks and bonuses"""
+        # Grinders occasionally make dollar purchases (1/4 whale rate)
+        if random.random() < self.config.grinder_purchase_probability:
+            spend_amount = random.uniform(
+                self.config.grinder_purchase_min,
+                self.config.grinder_purchase_max
+            )
+            player.wallet_balance += spend_amount
+            player.total_spent += spend_amount
+            self.total_revenue += spend_amount
         
-        if random.random() < 0.7:  # 70% chance to place sticker
-            self._create_new_sticker(player)
-        
-        if random.random() < 0.8:  # 80% chance to scan
+        # Grinders focus on SCANNING for streaks and bonuses (economy wins)
+        if random.random() < 0.9:  # 90% chance to scan (high priority for streaks)
             self._simulate_scan_behavior(player)
+            player.scanned_today = True
+        
+        # Grinders rarely place stickers (not their focus)
+        if random.random() < 0.2:  # 20% chance to place sticker (low priority)
+            self._create_new_sticker(player)
+            player.placed_today = True
     
     def _simulate_casual_behavior(self, player: Player):
-        """Simulate casual player behavior"""
-        # Casual players are less active but more social
-        if random.random() < 0.4:  # 40% chance to place sticker
+        """Simulate casual player behavior - base behavior, does a little of everything"""
+        # Casual players do a little of everything (base behavior)
+        if random.random() < 0.5:  # 50% chance to place sticker (moderate)
             self._create_new_sticker(player)
+            player.placed_today = True
         
-        if random.random() < 0.5:  # 50% chance to scan
+        if random.random() < 0.6:  # 60% chance to scan (moderate)
             self._simulate_scan_behavior(player)
+            player.scanned_today = True
         
         # Casual players might spend occasionally
         if random.random() < self.config.casual_purchase_probability:
@@ -723,13 +1008,21 @@ class FYNDRLifeSimulator:
         if self.current_day - player.join_day <= self.config.new_player_bonus_days:
             base_points *= self.config.new_player_bonus_multiplier
         
-        # Apply streak bonus
-        if player.streak_days >= self.config.streak_bonus_days:
-            base_points *= self.config.streak_bonus_multiplier
+        # Apply scan streak bonus (for scanning activity)
+        if player.scan_streak_days >= self.config.scan_streak_bonus_days:
+            base_points *= self.config.scan_streak_bonus_multiplier
+        
+        # Apply activity streak bonus (for any activity)
+        if player.streak_days >= self.config.activity_streak_bonus_days:
+            base_points *= self.config.activity_streak_bonus_multiplier
         
         # Apply comeback bonus
         if player.days_since_last_scan >= self.config.comeback_bonus_days:
             base_points *= self.config.comeback_bonus_multiplier
+        
+        # Apply referral bonus (for players who successfully referred others)
+        if player.referral_bonus_remaining > 0:
+            base_points *= self.config.referral_reward_multiplier
         
         return base_points
     
@@ -764,9 +1057,13 @@ class FYNDRLifeSimulator:
         if self.current_day - scanner.join_day <= self.config.new_player_bonus_days:
             base_points *= self.config.new_player_bonus_multiplier
         
-        # Apply streak bonus (for the scanner, not owner)
-        if scanner.streak_days >= self.config.streak_bonus_days:
-            base_points *= self.config.streak_bonus_multiplier
+        # Apply scan streak bonus (for the scanner's scanning activity)
+        if scanner.scan_streak_days >= self.config.scan_streak_bonus_days:
+            base_points *= self.config.scan_streak_bonus_multiplier
+        
+        # Apply activity streak bonus (for the scanner's any activity)
+        if scanner.streak_days >= self.config.activity_streak_bonus_days:
+            base_points *= self.config.activity_streak_bonus_multiplier
         
         # Apply comeback bonus (for the scanner, not owner)
         if scanner.days_since_last_scan >= self.config.comeback_bonus_days:
@@ -784,7 +1081,23 @@ class FYNDRLifeSimulator:
         
         if player.total_xp >= next_level_xp:
             # Level up!
+            old_level = player.level
             player.level += 1
+            
+            # Log level up event
+            self._log_event(
+                "level_up",
+                f"Player {player.id} ({player.player_type}) leveled up from {old_level} to {player.level}!",
+                affected_players=1,
+                additional_data={
+                    "player_id": player.id,
+                    "player_type": player.player_type,
+                    "old_level": old_level,
+                    "new_level": player.level,
+                    "total_xp": player.total_xp,
+                    "xp_threshold": next_level_xp
+                }
+            )
             
             # Handle grinder reinvestment on level up
             if (player.player_type == "grinder" and 
@@ -850,6 +1163,22 @@ class FYNDRLifeSimulator:
             sticker.is_in_sneeze_mode = True
             sticker.sneeze_mode_start_time = current_time_hours
             sticker.sneeze_mode_triggered_at_scans = sticker.total_scans
+            
+            # Log sneeze mode event
+            self._log_event(
+                "sneeze_mode",
+                f"Sticker {sticker.id} entered sneeze mode! {sticker.total_scans} scans triggered {self.config.social_sneeze_bonus}x bonus",
+                affected_stickers=1,
+                bonus_multiplier=1.0 + self.config.social_sneeze_bonus,
+                additional_data={
+                    "sticker_id": sticker.id,
+                    "owner_id": sticker.owner_id,
+                    "venue_type": sticker.venue_type,
+                    "scan_threshold": self.config.social_sneeze_threshold,
+                    "bonus_multiplier": self.config.social_sneeze_bonus,
+                    "duration_hours": self.config.social_sneeze_duration_hours
+                }
+            )
             
         # Check if sneeze mode should end
         elif (sticker.is_in_sneeze_mode and 
@@ -1087,6 +1416,58 @@ class FYNDRLifeSimulator:
         
         return daily_scans
     
+    def _check_comebacks(self):
+        """Check for churned players who might come back"""
+        comeback_count = 0
+        
+        for player in self.players.values():
+            # Skip if player is already active
+            if player.is_active:
+                continue
+                
+            # Skip if player hasn't been churned long enough
+            if player.comeback_eligible_day is None or self.current_day < player.comeback_eligible_day:
+                continue
+                
+            # Check if player comes back (1% chance per day)
+            if random.random() < self.config.comeback_probability:
+                # Player comes back!
+                player.is_active = True
+                player.churn_day = None
+                player.comeback_eligible_day = None
+                
+                # Give comeback bonus if not already received
+                if not player.has_received_comeback_bonus:
+                    player.total_points += self.config.comeback_bonus_points
+                    player.has_received_comeback_bonus = True
+                    self.total_points_earned += self.config.comeback_bonus_points
+                    
+                    # Log comeback event
+                    self._log_event(
+                        "comeback",
+                        f"Player {player.id} ({player.player_type}) returned with {self.config.comeback_bonus_points} bonus points!",
+                        affected_players=1,
+                        additional_data={
+                            "player_id": player.id,
+                            "player_type": player.player_type,
+                            "days_churned": self.current_day - (player.churn_day or 0),
+                            "bonus_points": self.config.comeback_bonus_points
+                        }
+                    )
+                
+                comeback_count += 1
+        
+        # Track comebacks for daily stats
+        self.comeback_players_today = comeback_count
+        
+        if comeback_count > 0:
+            self._log_event(
+                "comeback_batch",
+                f"{comeback_count} players returned today!",
+                affected_players=comeback_count,
+                additional_data={"comeback_count": comeback_count}
+            )
+
     def _add_new_players(self):
         """Add new players to the game using population and spread mechanics"""
         current_players = len([p for p in self.players.values() if p.is_active])
@@ -1126,6 +1507,22 @@ class FYNDRLifeSimulator:
                 new_players_count += viral_recruits
                 self.viral_recruits_today = viral_recruits
                 self.last_viral_spread_day = self.current_day  # Track when viral spread occurred
+                
+                # Track which players are recruiting (for referral rewards)
+                recruiting_player_ids = random.sample([p.id for p in active_players], min(recruiting_players, len(active_players)))
+                
+                # Log viral spread event
+                self._log_event(
+                    "viral_spread",
+                    f"Viral spread event! {recruiting_players} players recruited {viral_recruits} new players",
+                    affected_players=viral_recruits,
+                    additional_data={
+                        "recruiting_players": recruiting_players,
+                        "recruiting_player_ids": recruiting_player_ids,
+                        "viral_spread_percentage": self.config.viral_spread_percentage,
+                        "days_since_last_viral": self.current_day - self.last_viral_spread_day if self.last_viral_spread_day else 0
+                    }
+                )
             
             # 2. Organic growth based on sticker activity (daily calculation with area bounds)
             total_active_stickers = len([s for s in self.stickers.values() if s.is_active])
@@ -1147,18 +1544,39 @@ class FYNDRLifeSimulator:
                         area_organic_new_players = min(area_organic_new_players, self.max_possible_players - current_players - new_players_count)
                         new_players_count += area_organic_new_players
                         self.organic_new_players_today += area_organic_new_players
+                        
+                        # Log organic growth event
+                        if area_organic_new_players > 0:
+                            self._log_event(
+                                "organic_growth",
+                                f"Organic growth in area! {area_organic_new_players} new players from {len(area_stickers)} stickers",
+                                affected_players=area_organic_new_players,
+                                affected_stickers=len(area_stickers),
+                                additional_data={
+                                    "area_center": area_center,
+                                    "sticker_density_factor": sticker_density_factor,
+                                    "organic_rate": daily_organic_rate,
+                                    "threshold": self.config.organic_growth_tags_threshold
+                                }
+                            )
             
             # 3. Event boost for both viral and organic growth
             if self._is_event_active():
                 new_players_count = int(new_players_count * 2.0)
             
             # Add new players using the configurable player type ratios
-            for _ in range(new_players_count):
+            for i in range(new_players_count):
                 player_type = random.choices(
                     list(self.config.new_player_type_ratios.keys()),
                     weights=list(self.config.new_player_type_ratios.values())
                 )[0]
-                self._create_new_player(player_type)
+                
+                # Assign referral if this is from viral spread
+                referred_by = None
+                if should_trigger_viral and i < len(recruiting_player_ids):
+                    referred_by = recruiting_player_ids[i]
+                
+                self._create_new_player(player_type, referred_by=referred_by)
         else:
             # Use legacy growth mechanics
             if random.random() < self.config.new_player_daily_probability:
@@ -1172,13 +1590,14 @@ class FYNDRLifeSimulator:
                 )[0]
                 self._create_new_player(player_type)
     
-    def _create_new_player(self, player_type: str):
+    def _create_new_player(self, player_type: str, referred_by: Optional[int] = None):
         """Create a new player with the specified type"""
         player = Player(
             id=self.next_player_id,
             player_type=player_type,
             join_day=self.current_day,
-            location=(random.uniform(0, 0.1), random.uniform(0, 0.1))
+            location=(random.uniform(0, 0.1), random.uniform(0, 0.1)),
+            referred_by=referred_by
         )
         
         # Give new players some starting points and free packs
@@ -1187,6 +1606,25 @@ class FYNDRLifeSimulator:
             player.wallet_balance = 20.0  # $20 starting balance
             player.total_spent = 20.0
             self.total_revenue += 20.0
+        
+        # Award referral bonus to the referrer
+        if referred_by and referred_by in self.players:
+            referrer = self.players[referred_by]
+            referrer.referrals_made += 1
+            referrer.referral_bonus_remaining = self.config.referral_reward_days
+            
+            # Log referral event
+            self._log_event(
+                "referral_reward",
+                f"Player {referrer.id} earned referral bonus for recruiting player {player.id}",
+                affected_players=1,
+                additional_data={
+                    "referrer_id": referrer.id,
+                    "referred_player_id": player.id,
+                    "referral_bonus_days": self.config.referral_reward_days,
+                    "referral_multiplier": self.config.referral_reward_multiplier
+                }
+            )
         
         self.players[self.next_player_id] = player
         self.next_player_id += 1
@@ -1197,14 +1635,44 @@ class FYNDRLifeSimulator:
             return True
         return False
     
+    def _log_event(self, event_type: str, description: str, affected_players: int = 0, 
+                   affected_stickers: int = 0, bonus_multiplier: float = 1.0, 
+                   additional_data: Dict[str, Any] = None):
+        """Log a game event"""
+        event = GameEvent(
+            day=self.current_day,
+            event_type=event_type,
+            description=description,
+            affected_players=affected_players,
+            affected_stickers=affected_stickers,
+            bonus_multiplier=bonus_multiplier,
+            additional_data=additional_data or {}
+        )
+        self.game_events.append(event)
+        self.events_today.append(event)
+    
     def _update_events(self):
         """Update special events"""
         if self.current_event is None:
             if random.random() < (1.0 / self.config.event_frequency_days):
                 self.current_event = "special_event"
                 self.event_start_day = self.current_day
+                self._log_event(
+                    "seasonal_event",
+                    f"Seasonal event started! {self.config.event_bonus_multiplier}x point multiplier for {self.config.event_duration_days} days",
+                    bonus_multiplier=self.config.event_bonus_multiplier,
+                    additional_data={
+                        "duration_days": self.config.event_duration_days,
+                        "event_name": "special_event"
+                    }
+                )
         else:
             if self.current_day - self.event_start_day >= self.config.event_duration_days:
+                self._log_event(
+                    "seasonal_event_end",
+                    f"Seasonal event ended after {self.config.event_duration_days} days",
+                    additional_data={"event_name": "special_event"}
+                )
                 self.current_event = None
                 self.event_start_day = None
     
@@ -1251,6 +1719,21 @@ class FYNDRLifeSimulator:
                     if self._calculate_distance_meters(player.current_location, hub_location) <= self.config.social_hub_radius_meters:
                         players_in_social_hubs += 1
         
+        # Calculate event impacts
+        event_impacts = {}
+        active_events = []
+        
+        # Check for active events
+        if self.current_event:
+            active_events.append("seasonal_event")
+            event_impacts["seasonal_event"] = self.config.event_bonus_multiplier
+        
+        # Count sneeze mode stickers
+        sneeze_stickers = [s for s in self.stickers.values() if s.is_in_sneeze_mode]
+        if sneeze_stickers:
+            active_events.append("sneeze_mode")
+            event_impacts["sneeze_mode"] = 1.0 + self.config.social_sneeze_bonus
+        
         return DailyStats(
             day=self.current_day,
             total_players=len(active_players),
@@ -1288,7 +1771,13 @@ class FYNDRLifeSimulator:
             # === SOCIAL HUB METRICS ===
             active_social_hubs=active_social_hubs,
             social_hub_locations=social_hub_locations,
-            players_in_social_hubs=players_in_social_hubs
+            players_in_social_hubs=players_in_social_hubs,
+            
+            # === EVENT TRACKING ===
+            events_today=self.events_today.copy(),
+            active_events=active_events,
+            event_impacts=event_impacts,
+            comeback_players_today=self.comeback_players_today
         )
     
     def run_day(self):
@@ -1298,12 +1787,17 @@ class FYNDRLifeSimulator:
         # Reset daily tracking variables
         self.viral_recruits_today = 0
         self.organic_new_players_today = 0
+        self.comeback_players_today = 0
+        self.events_today = []  # Reset daily events
         
         # Update events
         self._update_events()
         
         # Add new players
         self._add_new_players()
+        
+        # Check for player comebacks
+        self._check_comebacks()
         
         # Simulate each active player
         for player in list(self.players.values()):
@@ -1346,6 +1840,10 @@ class FYNDRLifeSimulator:
                     
                     if self.config.enable_console_output:
                         self._print_daily_summary(daily_stats)
+                        
+                        # Print churn analysis every 7 days
+                        if self.current_day % 7 == 0 and self.current_day > 0:
+                            self.print_churn_analysis()
                     
                     # Auto-save
                     if self.current_day % self.config.auto_save_interval == 0:
@@ -1366,13 +1864,13 @@ class FYNDRLifeSimulator:
     
     def _print_daily_summary(self, stats: DailyStats):
         """Print daily summary to console"""
-        sneeze_info = f" | Sneeze: {stats.stickers_in_sneeze_mode}" if stats.stickers_in_sneeze_mode > 0 else ""
+        sneeze_info = f" | Sneeze: {stats.stickers_in_sneeze_mode:,}" if stats.stickers_in_sneeze_mode > 0 else ""
         hub_info = f" | Hubs: {stats.active_social_hubs}" if stats.active_social_hubs > 0 else ""
-        print(f"Day {stats.day:3d} | "
-              f"Players: {stats.active_players:4d} | "
-              f"Revenue: ${stats.total_revenue:8.2f} | "
-              f"Scans: {stats.total_scans:5d} | "
-              f"Stickers: {stats.total_stickers_placed:4d} | "
+        print(f"Day {stats.day:4d} | "
+              f"Players: {stats.active_players:4,} | "
+              f"Revenue: ${stats.total_revenue:8,.2f} | "
+              f"Scans: {stats.total_scans:6,} | "
+              f"Stickers: {stats.total_stickers_placed:4,} | "
               f"Retention: {stats.retention_rate:.1%} | "
               f"Growth: {stats.growth_rate:+.1%}{sneeze_info}{hub_info}")
     
@@ -1380,7 +1878,10 @@ class FYNDRLifeSimulator:
         """Save current simulation state to file"""
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"fyndr_life_sim_{timestamp}.json"
+            # Create organized directory structure
+            sim_dir = f"simulations/{timestamp}"
+            os.makedirs(sim_dir, exist_ok=True)
+            filename = f"{sim_dir}/fyndr_life_sim_{timestamp}.json"
         
         # Convert players to serializable format
         players_data = {}
@@ -1409,7 +1910,8 @@ class FYNDRLifeSimulator:
             "total_stickers_placed": self.total_stickers_placed,
             "players": players_data,
             "stickers": stickers_data,
-            "daily_stats": [asdict(s) for s in self.daily_stats]
+            "daily_stats": [asdict(s) for s in self.daily_stats],
+            "game_events": [asdict(e) for e in self.game_events]
         }
         
         with open(filename, 'w') as f:
@@ -1435,9 +1937,12 @@ class FYNDRLifeSimulator:
             
             # Export simulation data to CSV files for analysis
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            daily_stats_file = f"analysis_daily_stats_{timestamp}.csv"
-            players_file = f"analysis_players_{timestamp}.csv"
-            stickers_file = f"analysis_stickers_{timestamp}.csv"
+            # Use the same directory as the simulation state
+            sim_dir = f"simulations/{timestamp}"
+            os.makedirs(sim_dir, exist_ok=True)
+            daily_stats_file = f"{sim_dir}/analysis_daily_stats_{timestamp}.csv"
+            players_file = f"{sim_dir}/analysis_players_{timestamp}.csv"
+            stickers_file = f"{sim_dir}/analysis_stickers_{timestamp}.csv"
             
             # Export daily stats
             with open(daily_stats_file, 'w', newline='') as f:
@@ -1465,10 +1970,14 @@ class FYNDRLifeSimulator:
                     for player in self.players.values():
                         player_dict = asdict(player)
                         # Convert sets to lists
-                        for key, value in player_dict.items():
+                        keys_to_remove = []
+                        for key, value in list(player_dict.items()):  # Create a copy of items
                             if isinstance(value, set):
                                 player_dict[f"{key}_list"] = list(value)
-                                del player_dict[key]
+                                keys_to_remove.append(key)
+                        # Remove original set keys
+                        for key in keys_to_remove:
+                            del player_dict[key]
                         writer.writerow(player_dict)
             
             # Export sticker data
@@ -1488,10 +1997,14 @@ class FYNDRLifeSimulator:
                     for sticker in self.stickers.values():
                         sticker_dict = asdict(sticker)
                         # Convert sets to lists
-                        for key, value in sticker_dict.items():
+                        keys_to_remove = []
+                        for key, value in list(sticker_dict.items()):  # Create a copy of items
                             if isinstance(value, set):
                                 sticker_dict[f"{key}_list"] = list(value)
-                                del sticker_dict[key]
+                                keys_to_remove.append(key)
+                        # Remove original set keys
+                        for key in keys_to_remove:
+                            del sticker_dict[key]
                         writer.writerow(sticker_dict)
             
             # Load data into analyzer
@@ -1504,20 +2017,16 @@ class FYNDRLifeSimulator:
             print("Analyzing player behavior...")
             player_behavior = analyzer.analyze_player_behavior()
             
-            print("Analyzing growth patterns...")
-            growth_analysis = analyzer.analyze_growth_patterns()
-            
-            # Generate comprehensive report
+            # Generate economy report
             print("Generating analysis report...")
-            report = analyzer.generate_comprehensive_report()
+            report = analyzer.generate_economy_report()
             
             # Save analysis results
-            analysis_file = f"simulation_analysis_{timestamp}.json"
+            analysis_file = f"{sim_dir}/simulation_analysis_{timestamp}.json"
             with open(analysis_file, 'w') as f:
                 json.dump({
                     'economy_health': economy_health,
                     'player_behavior': player_behavior,
-                    'growth_analysis': growth_analysis,
                     'comprehensive_report': report,
                     'simulation_config': asdict(self.config),
                     'final_stats': asdict(self.daily_stats[-1]) if self.daily_stats else {}

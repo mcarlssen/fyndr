@@ -38,11 +38,11 @@ class FYNDRAnalyzer:
         analysis = {}
         
         # Revenue analysis
-        total_revenue = self.player_data['money_spent'].sum()
+        total_revenue = self.player_data['total_spent'].sum()
         analysis['total_revenue'] = total_revenue
         
         # Revenue distribution
-        revenue_by_type = self.player_data.groupby('player_type')['money_spent'].sum()
+        revenue_by_type = self.player_data.groupby('player_type')['total_spent'].sum()
         analysis['revenue_by_type'] = revenue_by_type.to_dict()
         
         # Player engagement
@@ -82,7 +82,7 @@ class FYNDRAnalyzer:
         analysis['player_distribution'] = player_distribution.to_dict()
         
         # Spending patterns
-        spending_stats = self.player_data.groupby('player_type')['money_spent'].agg(['mean', 'std', 'max'])
+        spending_stats = self.player_data.groupby('player_type')['total_spent'].agg(['mean', 'std', 'max'])
         analysis['spending_stats'] = spending_stats.to_dict()
         
         # Points earning patterns
@@ -90,7 +90,7 @@ class FYNDRAnalyzer:
         analysis['points_stats'] = points_stats.to_dict()
         
         # Sticker ownership patterns
-        sticker_stats = self.player_data.groupby('player_type')['stickers_owned'].agg(['mean', 'std', 'max'])
+        sticker_stats = self.player_data.groupby('player_type')['stickers_placed'].agg(['mean', 'std', 'max'])
         analysis['sticker_stats'] = sticker_stats.to_dict()
         
         # Level progression
@@ -112,16 +112,16 @@ class FYNDRAnalyzer:
         analysis['avg_scans_per_sticker'] = self.sticker_data['total_scans'].mean()
         
         # Performance by venue category
-        venue_performance = self.sticker_data.groupby('venue_category')['total_scans'].agg(['mean', 'std', 'count'])
+        venue_performance = self.sticker_data.groupby('venue_type')['total_scans'].agg(['mean', 'std', 'count'])
         analysis['venue_performance'] = venue_performance.to_dict()
         
-        # Performance by level
-        level_performance = self.sticker_data.groupby('level')['total_scans'].agg(['mean', 'std', 'count'])
-        analysis['level_performance'] = level_performance.to_dict()
+        # Performance by venue type (removed level grouping since stickers don't have levels)
+        # level_performance = self.sticker_data.groupby('level')['total_scans'].agg(['mean', 'std', 'count'])
+        # analysis['level_performance'] = level_performance.to_dict()
         
         # Top performing stickers
         top_stickers = self.sticker_data.nlargest(10, 'total_scans')
-        analysis['top_stickers'] = top_stickers[['id', 'owner_id', 'venue_category', 'total_scans']].to_dict('records')
+        analysis['top_stickers'] = top_stickers[['id', 'owner_id', 'venue_type', 'total_scans']].to_dict('records')
         
         return analysis
     
@@ -164,8 +164,10 @@ class FYNDRAnalyzer:
         report.append("")
         
         report.append("Average Points by Type:")
-        for player_type, points in player_behavior['avg_points_by_type'].items():
-            report.append(f"  {player_type.title()}: {points:.1f}")
+        points_stats = player_behavior['points_stats']
+        for player_type in points_stats['mean'].keys():
+            avg_points = points_stats['mean'][player_type]
+            report.append(f"  {player_type.title()}: {avg_points:.1f}")
         report.append("")
         
         # Sticker Performance Section
@@ -234,7 +236,7 @@ class FYNDRAnalyzer:
         
         # 3. Revenue by Player Type
         plt.figure(figsize=(10, 6))
-        revenue_by_type = self.player_data.groupby('player_type')['money_spent'].sum()
+        revenue_by_type = self.player_data.groupby('player_type')['total_spent'].sum()
         bars = plt.bar(revenue_by_type.index, revenue_by_type.values, color=colors)
         plt.title('Revenue by Player Type', fontsize=16, fontweight='bold')
         plt.xlabel('Player Type')
@@ -324,5 +326,4 @@ def main():
     print("Make sure you have run a simulation first to generate CSV files.")
 
 if __name__ == "__main__":
-    main()
-EOF 
+    main() 
