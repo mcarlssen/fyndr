@@ -10,7 +10,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
 import os
 import json
-from spatial_analysis import SpatialAnalyzer, create_spatial_analyzer_from_simulation
+from .spatial_analysis import SpatialAnalyzer, create_spatial_analyzer_from_simulation
 
 
 class HeatmapVisualizer:
@@ -261,12 +261,17 @@ class HeatmapVisualizer:
     
     def generate_all_animations(self, simulation_file: str, 
                               heatmap_types: List[str] = None,
-                              fps: int = 5) -> Dict[str, str]:
+                              fps: int = 5, output_dir: str = None) -> Dict[str, str]:
         """Generate all types of animated heatmaps"""
         
         if heatmap_types is None:
             heatmap_types = ['sticker_density', 'player_activity', 'scan_activity', 
                            'value_concentration', 'viral_activity']
+        
+        # Use organized output directory if provided
+        if output_dir:
+            self.output_dir = output_dir
+            os.makedirs(output_dir, exist_ok=True)
         
         # Load simulation data
         with open(simulation_file, 'r') as f:

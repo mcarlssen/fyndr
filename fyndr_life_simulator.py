@@ -51,7 +51,7 @@ class LifeSimConfig:
     # === SIMULATION CONTROL ===
     simulation_name: str = "FYNDR Life Sim - Population Mechanics"
     max_days: int = 270  # 0 = run indefinitely
-    real_time_speed: float = 1000  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
+    real_time_speed: float = 0  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
     auto_save_interval: int = 2000  # Save every N days
     enable_visualization: bool = True
     enable_console_output: bool = True
@@ -119,12 +119,12 @@ class LifeSimConfig:
     social_hub_attraction_radius: float = 200.0  # How far players are drawn to social hubs
     
     # Player type scanning behavior (percentage of available stickers per day)
-    whale_scan_percentage: float = 0.02  # 2% of available stickers per day
-    grinder_scan_percentage: float = 0.40  # 40% of available stickers per day
-    casual_scan_percentage: float = 0.07  # 7% of available stickers per day
+    whale_scan_percentage: float = 0.3  # 30% chance to scan per day
+    grinder_scan_percentage: float = 0.95  # 90% chance to scan per day
+    casual_scan_percentage: float = 0.6  # 60% chance to scan per day
     
     # === STICKER DENSITY LIMITS ===
-    sticker_placement_cooldown_days: int = 1  # Minimum days between sticker placements per player
+    sticker_placement_cooldown_days: int = 0  # No cooldown - allow multiple stickers per day
     
     # === REALISTIC DENSITY SIMULATION ===
     enable_realistic_density: bool = True  # Enable area-specific density limits
@@ -134,32 +134,35 @@ class LifeSimConfig:
     social_hub_density: int = 1500  # Very high density in social hubs
     
     # === MONETIZATION ===
-    pack_price_points: int = 750
+    pack_price_points: int = 550
     pack_price_dollars: float = 3.0
     points_per_dollar: float = 250.0
     wallet_topup_min: float = 6.0
     wallet_topup_max: float = 60.0
     
+    # === PRICE SENSITIVITY MECHANICS ===
+    enable_price_sensitivity: bool = True  # Enable price-based purchase probability adjustments
+    price_sensitivity_factor: float = .25  # How much price affects purchase probability (0.1 = 10% change per $1)
+    
     # === PURCHASING BEHAVIOR ===
     # Whale purchasing behavior (monthly rates converted to daily)
-    whale_purchase_probability: float = 0.0027  # 2.7% monthly = 0.09% daily (2-4 purchases/month)
-    whale_purchase_min: float = 3.0  # Minimum purchase amount
-    whale_purchase_max: float = 30.0  # Maximum purchase amount
+    whale_purchase_probability: float = 0.1  # 10% daily = 3 purchases/month (2-4 purchases/month)
+    # Note: whale_purchase_min/max removed - now using wallet_topup_min/max ($6-60)
     
     # Grinder purchasing behavior (1/4 whale rate + point reinvestment)
-    grinder_purchase_probability: float = 0.0007  # 0.7% monthly = 0.023% daily (0.5-1% monthly)
+    grinder_purchase_probability: float = 0.025  # 2.5% daily = 0.75 purchases/month (0.5-1% monthly)
     grinder_purchase_min: float = 3.0  # Minimum purchase amount
     grinder_purchase_max: float = 9.0  # Maximum purchase amount
     grinder_reinvest_on_levelup: bool = True  # Grinders reinvest all points when leveling up
     grinder_reinvest_percentage: float = 1.0  # 100% of points reinvested on level up
     
     # Casual purchasing behavior  
-    casual_purchase_probability: float = 0.00033  # 1% chance per month to spend money
+    casual_purchase_probability: float = 0.033  # 3.3% daily = 1 purchase/month to spend money
     casual_purchase_min: float = 3.0  # Minimum purchase amount
     casual_purchase_max: float = 3.0  # Maximum purchase amount
     
     # === SCANNING MECHANICS ===
-    sticker_scan_cooldown_hours: int = 11
+    sticker_scan_cooldown_hours: int = 11  # 1 hour cooldown for more frequent scanning
     
     # === BONUS SYSTEMS ===
     # Streak bonuses: Rewards consecutive daily activity (no cooldown, resets if inactive)
@@ -187,12 +190,6 @@ class LifeSimConfig:
     event_duration_days: int = 7  # How long events last once triggered
     event_bonus_multiplier: float = 1.5  # Point multiplier during events (applies to all scans)
     
-    # === NEW PLAYER ONBOARDING ===
-    # New player bonus: Boosts new players for their first week (no cooldown, one-time per player)
-    new_player_bonus_days: int = 7  # Days of bonus for new players
-    new_player_bonus_multiplier: float = 3.0  # Point multiplier for new players
-    new_player_free_packs: int = 0  # Free sticker packs for new players
-    
     # === REFERRAL REWARD SYSTEM ===
     # Referral rewards: Players who refer others get bonuses
     referral_reward_multiplier: float = 4.0  # Point multiplier for referrers
@@ -204,7 +201,7 @@ class LifeSimConfig:
     churn_curves: Dict[str, Dict[str, float]] = None  # Will be set in __post_init__
     
     # === COMEBACK MECHANICS ===
-    comeback_cooldown_days: int = 180  # 6 months cooldown before comeback is possible
+    comeback_cooldown_days: int = 30  # 30 days cooldown before comeback is possible
     comeback_probability: float = 0.01  # 1% chance per day for churned players to return
     comeback_bonus_points: float = 500.0  # Bonus points for returning players
     
@@ -220,6 +217,24 @@ class LifeSimConfig:
     # === STARTING POPULATION ===
     starting_player_count: int = 20  # Number of players to start the simulation with
     starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
+    
+    # === STARTING PLAYER REWARDS ===
+    starting_player_points: float = 100.0  # Starting points for initial players
+    starting_player_stickers: int = 6  # Free stickers for initial players
+    starting_whale_wallet_balance: float = 0.0  # Starting wallet balance for whale players
+    starting_whale_total_spent: float = 0.0  # Starting total spent for whale players
+
+    # === NEW PLAYER ONBOARDING ===
+    # New player bonus: Boosts new players for their first week (no cooldown, one-time per player)
+    new_player_bonus_days: int = 7  # Days of bonus for new players
+    new_player_bonus_multiplier: float = 3.0  # Point multiplier for new players
+    new_player_free_packs: int = 0  # Free sticker packs for new players
+    
+    # === NEW PLAYER STARTING ASSETS ===
+    new_player_points: float = 0.0  # Starting points for new players (who join later)
+    new_player_stickers: int = 0  # Starting stickers for new players (0 = must earn/purchase)
+    new_player_whale_wallet_balance: float = 0.0  # Starting wallet balance for new whale players
+    new_player_whale_total_spent: float = 0.0  # Starting total spent for new whale players
     
     # Viral spread mechanics
     viral_spread_percentage: float = 1.2  # avg .06 to 1.2% of active players recruit new players
@@ -314,6 +329,12 @@ class Player:
     days_since_last_scan: int = 0
     days_since_last_placement: int = 0
     
+    # === STICKER INVENTORY TRACKING ===
+    stickers_owned: int = 0  # Total stickers in inventory
+    sticker_packs_purchased: int = 0  # Packs bought with money
+    sticker_packs_earned: int = 0  # Packs bought with points
+    total_stickers_purchased: int = 0  # Total stickers bought (money + points)
+    
     # === STREAK TRACKING ===
     streak_days: int = 0  # Legacy - total activity streak
     scan_streak_days: int = 0  # Consecutive days of scanning
@@ -345,7 +366,10 @@ class Player:
     # === COMEBACK TRACKING ===
     churn_day: Optional[int] = None  # Day when player churned
     comeback_eligible_day: Optional[int] = None  # Day when player becomes eligible for comeback
-    has_received_comeback_bonus: bool = False  # Whether player has received comeback bonus
+    has_received_comeback_bonus: bool = False
+    
+    # === LEVEL-UP TRACKING ===
+    last_level_up_day: Optional[int] = None  # Day when player last leveled up  # Whether player has received comeback bonus
     
     def __post_init__(self):
         if self.last_scan_times is None:
@@ -419,6 +443,12 @@ class DailyStats:
     avg_level: float
     retention_rate: float
     growth_rate: float
+    
+    # === STICKER ECONOMY ANALYTICS ===
+    total_stickers_purchased: int = 0  # Total stickers bought (money + points)
+    total_sticker_packs_purchased: int = 0  # Packs bought with money
+    total_sticker_packs_earned: int = 0  # Packs bought with points
+    purchase_to_placement_ratio: float = 0.0  # Ratio of purchases to placements
     
     # === POPULATION & SPREAD METRICS ===
     total_population: int = 100000
@@ -559,12 +589,13 @@ class FYNDRLifeSimulator:
                 player.daily_routine = [home_location, work_location] + player.social_hubs
                 player.last_movement_time = random.uniform(0, 24)  # Random start time
             
-            # Give new players some starting points and free packs
-            player.total_points = 100.0
+            # Give starting players some starting points and free packs
+            player.total_points = self.config.starting_player_points
+            player.stickers_owned = self.config.starting_player_stickers
             if player.player_type == "whale":
-                player.wallet_balance = 20.0  # $20 starting balance
-                player.total_spent = 20.0
-                self.total_revenue += 20.0
+                player.wallet_balance = self.config.starting_whale_wallet_balance
+                player.total_spent = self.config.starting_whale_total_spent
+                self.total_revenue += self.config.starting_whale_total_spent
             
             self.players[self.next_player_id] = player
             self.next_player_id += 1
@@ -573,6 +604,62 @@ class FYNDRLifeSimulator:
         initial_stickers = min(100, self.max_stickers_allowed)
         for _ in range(initial_stickers):
             self._create_new_sticker()
+    
+    def _purchase_sticker_pack_with_money(self, player: Player) -> bool:
+        """Purchase a sticker pack with real money"""
+        if player.wallet_balance < self.config.pack_price_dollars:
+            return False
+        
+        # Deduct money
+        player.wallet_balance -= self.config.pack_price_dollars
+        player.total_spent += self.config.pack_price_dollars
+        self.total_revenue += self.config.pack_price_dollars
+        
+        # Add stickers to inventory
+        stickers_per_pack = 6  # 6 stickers per pack
+        player.stickers_owned += stickers_per_pack
+        player.sticker_packs_purchased += 1
+        player.total_stickers_purchased += stickers_per_pack
+        
+        return True
+    
+    def _purchase_sticker_pack_with_points(self, player: Player) -> bool:
+        """Purchase a sticker pack with points"""
+        if player.total_points < self.config.pack_price_points:
+            return False
+        
+        # Deduct points
+        player.total_points -= self.config.pack_price_points
+        
+        # Add stickers to inventory
+        stickers_per_pack = 6  # 6 stickers per pack
+        player.stickers_owned += stickers_per_pack
+        player.sticker_packs_earned += 1
+        player.total_stickers_purchased += stickers_per_pack
+        
+        return True
+    
+    def _calculate_price_adjusted_probability(self, base_probability: float, player_type: str) -> float:
+        """Calculate purchase probability adjusted for price sensitivity"""
+        if not self.config.enable_price_sensitivity:
+            return base_probability
+        
+        # Use pack_price_dollars as the reference price (no separate base_pack_price needed)
+        # Price sensitivity is relative to the current pack price
+        # For now, we'll use a simple linear adjustment based on price level
+        # Lower prices = higher probability, higher prices = lower probability
+        
+        # Calculate price adjustment (10% change per $1 with 0.1 factor)
+        # If price is $2: +10% probability, if price is $4: -10% probability
+        price_adjustment = (self.config.pack_price_dollars - 3.0) * self.config.price_sensitivity_factor
+        
+        # Adjust probability (negative adjustment = lower price = higher probability)
+        adjusted_probability = base_probability * (1 - price_adjustment)
+        
+        # Ensure probability stays within reasonable bounds (0.1% to 50%)
+        adjusted_probability = max(0.001, min(0.5, adjusted_probability))
+        
+        return adjusted_probability
     
     def _create_new_sticker(self, player: Player = None):
         """Create a new sticker in the game with density limits"""
@@ -593,6 +680,10 @@ class FYNDRLifeSimulator:
             owner = random.choice(active_players)
         else:
             owner = player
+            
+        # Check if player has stickers to place
+        if owner.stickers_owned <= 0:
+            return False
             
         venue_type = random.choices(
             self.config.venue_types,
@@ -629,6 +720,9 @@ class FYNDRLifeSimulator:
             self.stickers[self.next_sticker_id] = sticker
             self.next_sticker_id += 1
             self.total_stickers_placed += 1
+            
+            # Deduct sticker from inventory
+            owner.stickers_owned -= 1
             
             # Track player's last sticker placement
             self.player_last_sticker_day[owner.id] = self.current_day
@@ -845,69 +939,19 @@ class FYNDRLifeSimulator:
         print("="*60)
     
     def _simulate_whale_behavior(self, player: Player):
-        """Simulate whale player behavior - focused on owning stickers, not scanning"""
-        # Whales are more likely to spend money
-        if random.random() < self.config.whale_purchase_probability:
-            spend_amount = random.uniform(
-                self.config.whale_purchase_min,
-                self.config.whale_purchase_max
-            )
-            player.wallet_balance += spend_amount
-            player.total_spent += spend_amount
-            self.total_revenue += spend_amount
-        
-        # Whales focus on PLACING stickers (farming points through ownership)
-        if random.random() < 0.9:  # 90% chance to place sticker (high priority)
-            self._create_new_sticker(player)
-            player.placed_today = True
-        
-        # Whales scan less frequently (not their focus)
-        if random.random() < 0.3:  # 30% chance to scan (low priority)
-            self._simulate_scan_behavior(player)
-            player.scanned_today = True
+        """Simulate whale player behavior - focused on sticker ownership and strategic spending"""
+        from player_behaviors import simulate_whale_behavior
+        simulate_whale_behavior(self, player)
     
     def _simulate_grinder_behavior(self, player: Player):
         """Simulate grinder player behavior - focused on economy wins via streaks and bonuses"""
-        # Grinders occasionally make dollar purchases (1/4 whale rate)
-        if random.random() < self.config.grinder_purchase_probability:
-            spend_amount = random.uniform(
-                self.config.grinder_purchase_min,
-                self.config.grinder_purchase_max
-            )
-            player.wallet_balance += spend_amount
-            player.total_spent += spend_amount
-            self.total_revenue += spend_amount
-        
-        # Grinders focus on SCANNING for streaks and bonuses (economy wins)
-        if random.random() < 0.9:  # 90% chance to scan (high priority for streaks)
-            self._simulate_scan_behavior(player)
-            player.scanned_today = True
-        
-        # Grinders rarely place stickers (not their focus)
-        if random.random() < 0.2:  # 20% chance to place sticker (low priority)
-            self._create_new_sticker(player)
-            player.placed_today = True
+        from player_behaviors import simulate_grinder_behavior
+        simulate_grinder_behavior(self, player)
     
     def _simulate_casual_behavior(self, player: Player):
-        """Simulate casual player behavior - base behavior, does a little of everything"""
-        # Casual players do a little of everything (base behavior)
-        if random.random() < 0.5:  # 50% chance to place sticker (moderate)
-            self._create_new_sticker(player)
-            player.placed_today = True
-        
-        if random.random() < 0.6:  # 60% chance to scan (moderate)
-            self._simulate_scan_behavior(player)
-            player.scanned_today = True
-        
-        # Casual players might spend occasionally
-        if random.random() < self.config.casual_purchase_probability:
-            spend_amount = random.uniform(
-                self.config.casual_purchase_min,
-                self.config.casual_purchase_max
-            )
-            player.wallet_balance += spend_amount
-            player.total_spent += spend_amount
-            self.total_revenue += spend_amount
+        """Simulate casual player behavior - balanced activity across all mechanics"""
+        from player_behaviors import simulate_casual_behavior
+        simulate_casual_behavior(self, player)
     
     def _simulate_scan_behavior(self, player: Player):
         """Simulate a player scanning stickers with geographic constraints"""
@@ -1083,6 +1127,7 @@ class FYNDRLifeSimulator:
             # Level up!
             old_level = player.level
             player.level += 1
+            player.last_level_up_day = self.current_day  # Track when player leveled up
             
             # Log level up event
             self._log_event(
@@ -1113,7 +1158,7 @@ class FYNDRLifeSimulator:
                 # Add to wallet balance
                 player.wallet_balance += dollars_reinvested
                 player.total_spent += dollars_reinvested
-                self.total_revenue += dollars_reinvested
+                # Note: Reinvestment doesn't generate revenue - it's internal point conversion
                 
                 # Reset points (they've been "spent")
                 player.total_points = 0
@@ -1600,12 +1645,13 @@ class FYNDRLifeSimulator:
             referred_by=referred_by
         )
         
-        # Give new players some starting points and free packs
-        player.total_points = 100.0
+        # Give new players starting assets based on configuration
+        player.total_points = self.config.new_player_points
+        player.stickers_owned = self.config.new_player_stickers
         if player.player_type == "whale":
-            player.wallet_balance = 20.0  # $20 starting balance
-            player.total_spent = 20.0
-            self.total_revenue += 20.0
+            player.wallet_balance = self.config.new_player_whale_wallet_balance
+            player.total_spent = self.config.new_player_whale_total_spent
+            self.total_revenue += self.config.new_player_whale_total_spent
         
         # Award referral bonus to the referrer
         if referred_by and referred_by in self.players:
@@ -1734,6 +1780,12 @@ class FYNDRLifeSimulator:
             active_events.append("sneeze_mode")
             event_impacts["sneeze_mode"] = 1.0 + self.config.social_sneeze_bonus
         
+        # Calculate sticker economy analytics
+        total_stickers_purchased = sum(p.total_stickers_purchased for p in active_players)
+        total_sticker_packs_purchased = sum(p.sticker_packs_purchased for p in active_players)
+        total_sticker_packs_earned = sum(p.sticker_packs_earned for p in active_players)
+        purchase_to_placement_ratio = total_stickers_purchased / max(self.total_stickers_placed, 1)
+        
         return DailyStats(
             day=self.current_day,
             total_players=len(active_players),
@@ -1749,6 +1801,12 @@ class FYNDRLifeSimulator:
             avg_level=avg_level,
             retention_rate=retention_rate,
             growth_rate=growth_rate,
+            
+            # === STICKER ECONOMY ANALYTICS ===
+            total_stickers_purchased=total_stickers_purchased,
+            total_sticker_packs_purchased=total_sticker_packs_purchased,
+            total_sticker_packs_earned=total_sticker_packs_earned,
+            purchase_to_placement_ratio=purchase_to_placement_ratio,
             
             # === POPULATION & SPREAD METRICS ===
             total_population=self.config.total_population,
@@ -1842,8 +1900,8 @@ class FYNDRLifeSimulator:
                         self._print_daily_summary(daily_stats)
                         
                         # Print churn analysis every 7 days
-                        if self.current_day % 7 == 0 and self.current_day > 0:
-                            self.print_churn_analysis()
+                        # if self.current_day % 7 == 0 and self.current_day > 0:
+                        #     self.print_churn_analysis()
                     
                     # Auto-save
                     if self.current_day % self.config.auto_save_interval == 0:
@@ -1874,14 +1932,18 @@ class FYNDRLifeSimulator:
               f"Retention: {stats.retention_rate:.1%} | "
               f"Growth: {stats.growth_rate:+.1%}{sneeze_info}{hub_info}")
     
-    def save_simulation_state(self, filename: str = None):
+    def save_simulation_state(self, filename: str = None, timestamp: str = None):
         """Save current simulation state to file"""
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if timestamp is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             # Create organized directory structure
             sim_dir = f"simulations/{timestamp}"
             os.makedirs(sim_dir, exist_ok=True)
+            # Save in subdirectory for organization
             filename = f"{sim_dir}/fyndr_life_sim_{timestamp}.json"
+            # Also save in current directory for analyzer compatibility
+            analyzer_filename = f"fyndr_life_sim_{timestamp}.json"
         
         # Convert players to serializable format
         players_data = {}
@@ -1914,8 +1976,14 @@ class FYNDRLifeSimulator:
             "game_events": [asdict(e) for e in self.game_events]
         }
         
+        # Save to organized directory
         with open(filename, 'w') as f:
             json.dump(state, f, indent=2)
+        
+        # Also save to current directory for analyzer compatibility
+        if 'analyzer_filename' in locals():
+            with open(analyzer_filename, 'w') as f:
+                json.dump(state, f, indent=2)
         
         print(f"Simulation state saved to {filename}")
     
@@ -1929,114 +1997,32 @@ class FYNDRLifeSimulator:
         print("="*60)
         
         try:
-            # Import analysis tools
-            from analysis_tools import FYNDRAnalyzer
+            # Import complete simulation analyzer
+            from analyze_complete_simulation import CompleteSimulationAnalyzer
             
-            # Create analyzer instance
-            analyzer = FYNDRAnalyzer()
-            
-            # Export simulation data to CSV files for analysis
+            # Get timestamp first, then save state with that timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # Use the same directory as the simulation state
-            sim_dir = f"simulations/{timestamp}"
-            os.makedirs(sim_dir, exist_ok=True)
-            daily_stats_file = f"{sim_dir}/analysis_daily_stats_{timestamp}.csv"
-            players_file = f"{sim_dir}/analysis_players_{timestamp}.csv"
-            stickers_file = f"{sim_dir}/analysis_stickers_{timestamp}.csv"
+            simulation_prefix = f"fyndr_life_sim_{timestamp}"
             
-            # Export daily stats
-            with open(daily_stats_file, 'w', newline='') as f:
-                if self.daily_stats:
-                    writer = csv.DictWriter(f, fieldnames=asdict(self.daily_stats[0]).keys())
-                    writer.writeheader()
-                    for stats in self.daily_stats:
-                        writer.writerow(asdict(stats))
+            # Save the current simulation state with the specific timestamp
+            self.save_simulation_state(timestamp=timestamp)
             
-            # Export player data
-            with open(players_file, 'w', newline='') as f:
-                if self.players:
-                    # Get all player attributes
-                    sample_player = list(self.players.values())[0]
-                    fieldnames = list(asdict(sample_player).keys())
-                    # Convert sets to lists for CSV compatibility
-                    for field in fieldnames:
-                        if hasattr(sample_player, field):
-                            attr = getattr(sample_player, field)
-                            if isinstance(attr, set):
-                                fieldnames[fieldnames.index(field)] = f"{field}_list"
-                    
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for player in self.players.values():
-                        player_dict = asdict(player)
-                        # Convert sets to lists
-                        keys_to_remove = []
-                        for key, value in list(player_dict.items()):  # Create a copy of items
-                            if isinstance(value, set):
-                                player_dict[f"{key}_list"] = list(value)
-                                keys_to_remove.append(key)
-                        # Remove original set keys
-                        for key in keys_to_remove:
-                            del player_dict[key]
-                        writer.writerow(player_dict)
+            # Create analyzer instance with the same simulation prefix
+            analyzer = CompleteSimulationAnalyzer(simulation_prefix)
             
-            # Export sticker data
-            with open(stickers_file, 'w', newline='') as f:
-                if self.stickers:
-                    sample_sticker = list(self.stickers.values())[0]
-                    fieldnames = list(asdict(sample_sticker).keys())
-                    # Convert sets to lists for CSV compatibility
-                    for field in fieldnames:
-                        if hasattr(sample_sticker, field):
-                            attr = getattr(sample_sticker, field)
-                            if isinstance(attr, set):
-                                fieldnames[fieldnames.index(field)] = f"{field}_list"
-                    
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    for sticker in self.stickers.values():
-                        sticker_dict = asdict(sticker)
-                        # Convert sets to lists
-                        keys_to_remove = []
-                        for key, value in list(sticker_dict.items()):  # Create a copy of items
-                            if isinstance(value, set):
-                                sticker_dict[f"{key}_list"] = list(value)
-                                keys_to_remove.append(key)
-                        # Remove original set keys
-                        for key in keys_to_remove:
-                            del sticker_dict[key]
-                        writer.writerow(sticker_dict)
+            if not analyzer.all_files:
+                print(f"No simulation files found with prefix: {simulation_prefix}")
+                return
             
-            # Load data into analyzer
-            analyzer.load_simulation_data(daily_stats_file, players_file, stickers_file)
+            # Generate complete analysis
+            print("Generating complete simulation analysis...")
+            analyzer.generate_complete_summary_report()
+            analyzer.generate_level_focused_report()
+            analyzer.generate_economy_analysis()
+            analyzer.generate_retention_analysis()
+            analyzer.generate_viral_growth_analysis()
             
-            # Run comprehensive analysis
-            print("Analyzing economy health...")
-            economy_health = analyzer.analyze_economy_health()
-            
-            print("Analyzing player behavior...")
-            player_behavior = analyzer.analyze_player_behavior()
-            
-            # Generate economy report
-            print("Generating analysis report...")
-            report = analyzer.generate_economy_report()
-            
-            # Save analysis results
-            analysis_file = f"{sim_dir}/simulation_analysis_{timestamp}.json"
-            with open(analysis_file, 'w') as f:
-                json.dump({
-                    'economy_health': economy_health,
-                    'player_behavior': player_behavior,
-                    'comprehensive_report': report,
-                    'simulation_config': asdict(self.config),
-                    'final_stats': asdict(self.daily_stats[-1]) if self.daily_stats else {}
-                }, f, indent=2)
-            
-            print(f"\nAnalysis completed! Results saved to:")
-            print(f"  - {analysis_file}")
-            print(f"  - {daily_stats_file}")
-            print(f"  - {players_file}")
-            print(f"  - {stickers_file}")
+            print(f"Complete simulation analysis saved to: {simulation_prefix}_analysis/")
             
             # Print summary to console
             print("\n" + "="*60)
@@ -2053,7 +2039,7 @@ class FYNDRLifeSimulator:
                 print(f"Growth Rate: {final_day.growth_rate:+.1%}")
             
         except ImportError:
-            print("Warning: analysis_tools module not found. Skipping analysis.")
+            print("Warning: analyze_complete_simulation module not found. Skipping analysis.")
         except Exception as e:
             print(f"Error during analysis: {e}")
             print("Continuing without analysis...")
@@ -2208,8 +2194,8 @@ def main():
         simulator.save_simulation_state()
         
         # Run analysis if enabled
-        if simulator.config.auto_analyze_on_completion:
-            simulator.run_analysis_on_completion()
+        #if simulator.config.auto_analyze_on_completion:
+        #    simulator.run_analysis_on_completion()
         
         print("Simulation completed")
 

@@ -14,6 +14,8 @@ from typing import Dict, List, Any, Tuple
 from datetime import datetime
 import seaborn as sns
 from collections import defaultdict
+import os
+import glob
 
 class FYNDRAnalyzer:
     """Analyzes simulation results and provides insights"""
@@ -285,14 +287,14 @@ class FYNDRAnalyzer:
         axes[0, 1].grid(True, alpha=0.3)
         
         # Average points per player
-        axes[1, 0].plot(self.daily_data['day'], self.daily_data['avg_points_per_player'], color='#45B7D1')
+        axes[1, 0].plot(self.daily_data['day'], self.daily_data['total_points_earned'], color='#45B7D1')
         axes[1, 0].set_title('Average Points per Player')
         axes[1, 0].set_xlabel('Day')
         axes[1, 0].set_ylabel('Points')
         axes[1, 0].grid(True, alpha=0.3)
         
         # Average scans per player
-        axes[1, 1].plot(self.daily_data['day'], self.daily_data['avg_scans_per_player'], color='#96CEB4')
+        axes[1, 1].plot(self.daily_data['day'], self.daily_data['total_scans'], color='#96CEB4')
         axes[1, 1].set_title('Average Scans per Player')
         axes[1, 1].set_xlabel('Day')
         axes[1, 1].set_ylabel('Scans')
@@ -317,13 +319,125 @@ class FYNDRAnalyzer:
             json.dump(analysis, f, indent=2, default=str)
         
         print(f"Analysis exported to {filename}")
+    
+    @staticmethod
+    def find_most_recent_simulation(simulations_dir: str = "simulations") -> str:
+        """Find the most recent simulation directory"""
+        if not os.path.exists(simulations_dir):
+            raise FileNotFoundError(f"Simulations directory '{simulations_dir}' not found")
+        
+        # Get all simulation directories
+        sim_dirs = [d for d in os.listdir(simulations_dir) 
+                   if os.path.isdir(os.path.join(simulations_dir, d))]
+        
+        if not sim_dirs:
+            raise FileNotFoundError(f"No simulation directories found in '{simulations_dir}'")
+        
+        # Sort by timestamp (directories are named with timestamps)
+        sim_dirs.sort(reverse=True)
+        most_recent = sim_dirs[0]
+        
+        return os.path.join(simulations_dir, most_recent)
+    
+    @staticmethod
+    def find_simulation_files(simulation_dir: str) -> Dict[str, str]:
+        """Find the analysis files in a simulation directory"""
+        files = {}
+        
+        # Look for the standard analysis files
+        patterns = {
+            'daily_stats': 'analysis_daily_stats_*.csv',
+            'players': 'analysis_players_*.csv', 
+            'stickers': 'analysis_stickers_*.csv',
+            'analysis': 'simulation_analysis_*.json'
+        }
+        
+        for file_type, pattern in patterns.items():
+            matches = glob.glob(os.path.join(simulation_dir, pattern))
+            if matches:
+                # Get the most recent file if multiple matches
+                files[file_type] = max(matches, key=os.path.getmtime)
+            else:
+                print(f"Warning: No {file_type} file found in {simulation_dir}")
+        
+        return files
 
 def main():
-    """Main function for testing the analyzer"""
+    """Main function to analyze the most recent simulation"""
     print("FYNDR Analysis Tools")
     print("=" * 30)
-    print("This tool analyzes simulation results and generates reports.")
-    print("Make sure you have run a simulation first to generate CSV files.")
+    print("Analyzing the most recent simulation...")
+    
+    try:
+        # Find the most recent simulation
+        simulation_dir = FYNDRAnalyzer.find_most_recent_simulation()
+        print(f"Found most recent simulation: {simulation_dir}")
+        
+        # Find the analysis files
+        files = FYNDRAnalyzer.find_simulation_files(simulation_dir)
+        
+        # Check if we have the required files
+        required_files = ['daily_stats', 'players', 'stickers']
+        missing_files = [f for f in required_files if f not in files]
+        
+        if missing_files:
+            print(f"Error: Missing required files: {missing_files}")
+            print("Available files:")
+            for file_type, file_path in files.items():
+                print(f"  {file_type}: {file_path}")
+            return
+        
+        # Create analyzer and load data
+        analyzer = FYNDRAnalyzer()
+        analyzer.load_simulation_data(
+            files['daily_stats'],
+            files['players'], 
+            files['stickers']
+        )
+        
+        print("Data loaded successfully!")
+        
+        # Run analysis
+        print("\nRunning economy health analysis...")
+        economy_health = analyzer.analyze_economy_health()
+        
+        print("\nRunning player behavior analysis...")
+        player_behavior = analyzer.analyze_player_behavior()
+        
+        print("\nRunning sticker performance analysis...")
+        sticker_performance = analyzer.analyze_sticker_performance()
+        
+        # Generate visualizations
+        print("\nGenerating visualizations...")
+        output_dir = os.path.join(simulation_dir, "analysis_output")
+        os.makedirs(output_dir, exist_ok=True)
+        analyzer.create_visualizations(output_dir)
+        
+        # Export analysis
+        analysis_file = os.path.join(output_dir, "comprehensive_analysis.json")
+        analyzer.export_analysis(analysis_file)
+        
+        # Print summary
+        print("\n" + "="*50)
+        print("ANALYSIS SUMMARY")
+        print("="*50)
+        print(f"Total Revenue: ${economy_health['total_revenue']:,.2f}")
+        print(f"Active Players: {economy_health.get('active_players', 'N/A')}")
+        print(f"Total Stickers: {economy_health.get('total_stickers', 'N/A')}")
+        
+        print(f"\nRevenue by Player Type:")
+        for player_type, revenue in economy_health.get('revenue_by_type', {}).items():
+            print(f"  {player_type}: ${revenue:,.2f}")
+        
+        print(f"\nAnalysis complete! Results saved to: {output_dir}")
+        
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        print("Make sure you have run a simulation first to generate analysis files.")
+    except Exception as e:
+        print(f"Error during analysis: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main() 

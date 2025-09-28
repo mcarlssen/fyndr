@@ -63,9 +63,11 @@ class AdvancedGameConfig:
     wallet_topup_max: float = 50.0
     
     # === PLAYER BEHAVIOR CAPS ===
-    daily_scan_cap: int = 20
+    # Removed daily_scan_cap - replaced with per-sticker cooldown
+    # daily_scan_cap: int = 20
     weekly_earn_cap: int = 500
     daily_passive_cap: int = 100  # Max points from passive sticker earnings
+    sticker_scan_cooldown_hours: int = 11  # Hours between scans of same sticker by same player
     
     # === RETENTION MECHANICS ===
     churn_probability_base: float = 0.001  # Daily base churn rate
@@ -80,8 +82,9 @@ class AdvancedGameConfig:
     comeback_bonus_multiplier: float = 2.0
     
     # === STICKER DECAY ===
-    sticker_decay_rate: float = 0.1  # 10% decay per day without scans
-    sticker_min_value: float = 0.1  # Minimum value before becoming inactive
+    # Removed sticker decay - no longer needed
+    # sticker_decay_rate: float = 0.1  # 10% decay per day without scans
+    # sticker_min_value: float = 0.1  # Minimum value before becoming inactive
     
     # === NEW PLAYER ONBOARDING ===
     new_player_bonus_days: int = 7
@@ -93,11 +96,35 @@ class AdvancedGameConfig:
     event_duration_days: int = 7
     event_bonus_multiplier: float = 1.5
     
+    # === POPULATION & SPREAD MECHANICS ===
+    # Population variables for modeling game spread in a locale
+    total_population: int = 100000  # Total population of the area
+    population_density_per_quarter_sq_mile: float = 25000.0  # Population density per quarter square mile
+    
+    # Viral spread mechanics
+    viral_spread_percentage: float = 0.40  # 40% of active players recruit new players
+    viral_spread_frequency_days: int = 14  # Every 2 weeks
+    viral_spread_cap_percentage: float = 0.40  # Maximum 40% of total population can be players
+    
+    # Organic growth mechanics
+    organic_growth_rate_min: float = 0.0002  # 0.02% minimum organic growth per 200 tags per week
+    organic_growth_rate_max: float = 0.0005  # 0.05% maximum organic growth per 200 tags per week
+    organic_growth_tags_threshold: int = 200  # Number of tags required for organic growth calculation
+    
+    # Player type distribution for new players
+    new_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
+    
     def __post_init__(self):
         if self.diminishing_rates is None:
             self.diminishing_rates = [1.0, 0.5, 0.25]
         if self.level_multipliers is None:
             self.level_multipliers = [1.0, 1.05, 1.10, 1.15, 1.20]
+        if self.new_player_type_ratios is None:
+            self.new_player_type_ratios = {
+                'whale': 0.05,    # 5% whales
+                'grinder': 0.25,  # 25% grinders  
+                'casual': 0.70    # 70% casual
+            }
 
 @dataclass
 class AdvancedPlayer:
@@ -115,6 +142,7 @@ class AdvancedPlayer:
     unique_scans_today: int = 0
     venues_visited_this_week: set = None
     last_scan_locations: Dict[int, Tuple[float, float]] = None
+    last_scan_times: Dict[int, int] = None  # sticker_id -> last_scan_day
     
     # === RETENTION TRACKING ===
     days_since_last_activity: int = 0
@@ -140,6 +168,8 @@ class AdvancedPlayer:
             self.venues_visited_this_week = set()
         if self.last_scan_locations is None:
             self.last_scan_locations = {}
+        if self.last_scan_times is None:
+            self.last_scan_times = {}
 
 @dataclass
 class AdvancedSticker:
@@ -155,10 +185,9 @@ class AdvancedSticker:
     daily_earnings: float = 0.0
     is_active: bool = True
     
-    # === DECAY MECHANICS ===
+    # === VALUE TRACKING ===
     base_value: float = 1.0
     current_value: float = 1.0
-    days_since_last_scan: int = 0
     total_earnings: float = 0.0
 
 class AdvancedFYNDRSimulator:
@@ -189,6 +218,11 @@ class AdvancedFYNDRSimulator:
         self.whale_purchases = 0
         self.grinder_purchases = 0
         self.casual_purchases = 0
+        
+        # === POPULATION & SPREAD TRACKING ===
+        self.viral_recruits_today = 0
+        self.organic_new_players_today = 0
+        self.max_possible_players = int(self.config.total_population * self.config.viral_spread_cap_percentage)
     
     def add_player(self, player_type: str, level: int = 1, is_new: bool = True) -> int:
         """Add a new player to the simulation"""
@@ -334,9 +368,12 @@ class AdvancedFYNDRSimulator:
         scanner = self.players[scanner_id]
         sticker = self.stickers[sticker_id]
         
-        # Check daily caps
-        if scanner.scans_today >= self.config.daily_scan_cap:
-            return False
+        # Check per-sticker cooldown (11 hours = ~0.46 days)
+        cooldown_days = self.config.sticker_scan_cooldown_hours / 24.0
+        if sticker_id in scanner.last_scan_times:
+            days_since_last_scan = self.current_day - scanner.last_scan_times[sticker_id]
+            if days_since_last_scan < cooldown_days:
+                return False
         
         # Calculate points
         scanner_points, bonus_type, owner_points = self.calculate_scan_points(
@@ -359,6 +396,7 @@ class AdvancedFYNDRSimulator:
         scanner.total_points += scanner_points
         scanner.total_scans += 1
         scanner.last_scan_locations[sticker.id] = scan_location
+        scanner.last_scan_times[sticker.id] = self.current_day
         scanner.venues_visited_this_week.add(sticker.venue_category)
         scanner.last_scan_day = self.current_day
         scanner.days_since_last_activity = 0
@@ -443,8 +481,6 @@ class AdvancedFYNDRSimulator:
         # Moderate scanning activity
         scans_today = random.randint(5, 12)
         for _ in range(scans_today):
-            if player.scans_today >= self.config.daily_scan_cap:
-                break
             
             available_stickers = [s for s in self.stickers.values() if s.is_active]
             if available_stickers:
@@ -460,8 +496,6 @@ class AdvancedFYNDRSimulator:
         # Grinders scan heavily
         scans_today = random.randint(15, 25)
         for _ in range(scans_today):
-            if player.scans_today >= self.config.daily_scan_cap:
-                break
             
             available_stickers = [s for s in self.stickers.values() if s.is_active]
             if available_stickers:
@@ -506,8 +540,6 @@ class AdvancedFYNDRSimulator:
         # Casual players scan moderately
         scans_today = random.randint(3, 8)
         for _ in range(scans_today):
-            if player.scans_today >= self.config.daily_scan_cap:
-                break
             
             available_stickers = [s for s in self.stickers.values() if s.is_active]
             if available_stickers:
@@ -550,36 +582,52 @@ class AdvancedFYNDRSimulator:
                     venue = random.choice(["campus", "coffee", "library", "park", "restaurant"])
                     self.add_sticker(player.id, location, venue, player.level)
     
-    def update_sticker_decay(self):
-        """Update sticker decay mechanics"""
-        for sticker in self.stickers.values():
-            if sticker.is_active:
-                sticker.days_since_last_scan += 1
-                if sticker.days_since_last_scan > 0:
-                    decay_factor = 1 - (self.config.sticker_decay_rate * sticker.days_since_last_scan)
-                    sticker.current_value = max(sticker.base_value * decay_factor, self.config.sticker_min_value)
-                    
-                    if sticker.current_value <= self.config.sticker_min_value:
-                        sticker.is_active = False
+    # Removed update_sticker_decay - no longer needed
     
     def simulate_new_player_growth(self, day: int):
-        """Simulate new player acquisition"""
-        # Base growth rate
-        base_growth_rate = 0.01  # 1% daily growth
-        
-        # Event boost
-        if self.is_event_active():
-            base_growth_rate *= 2.0
-        
-        # Calculate new players
+        """Simulate new player acquisition with population and spread mechanics"""
         current_players = len([p for p in self.players.values() if p.is_active])
-        new_players_count = int(current_players * base_growth_rate)
         
-        # Add new players
+        # Check if we've reached the population cap
+        if current_players >= self.max_possible_players:
+            return
+        
+        new_players_count = 0
+        
+        # 1. Viral spread mechanics (40% of active players recruit 1 new player per 2 weeks)
+        if day % self.config.viral_spread_frequency_days == 0:
+            active_players = [p for p in self.players.values() if p.is_active]
+            recruiting_players = int(len(active_players) * self.config.viral_spread_percentage)
+            viral_recruits = min(recruiting_players, self.max_possible_players - current_players)
+            new_players_count += viral_recruits
+            self.viral_recruits_today = viral_recruits
+        
+        # 2. Organic growth based on sticker activity (0.02-0.05% per 200 tags per week)
+        if day % 7 == 0:  # Weekly organic growth
+            total_active_stickers = len([s for s in self.stickers.values() if s.is_active])
+            if total_active_stickers >= self.config.organic_growth_tags_threshold:
+                # Calculate organic growth rate based on sticker density
+                sticker_density_factor = min(total_active_stickers / self.config.organic_growth_tags_threshold, 3.0)
+                organic_rate = random.uniform(
+                    self.config.organic_growth_rate_min,
+                    self.config.organic_growth_rate_max
+                ) * sticker_density_factor
+                
+                # Apply to total population, not just current players
+                organic_new_players = int(self.config.total_population * organic_rate)
+                organic_new_players = min(organic_new_players, self.max_possible_players - current_players - new_players_count)
+                new_players_count += organic_new_players
+                self.organic_new_players_today = organic_new_players
+        
+        # 3. Event boost for both viral and organic growth
+        if self.is_event_active():
+            new_players_count = int(new_players_count * 2.0)
+        
+        # Add new players using the configurable player type ratios
         for _ in range(new_players_count):
             player_type = random.choices(
-                ['whale', 'grinder', 'casual'],
-                weights=[0.05, 0.25, 0.70]  # 5% whales, 25% grinders, 70% casual
+                list(self.config.new_player_type_ratios.keys()),
+                weights=list(self.config.new_player_type_ratios.values())
             )[0]
             self.add_player(player_type, is_new=True)
             self.new_players_today += 1
@@ -599,6 +647,10 @@ class AdvancedFYNDRSimulator:
             sticker.scans_today = 0
             sticker.unique_scans_today = 0
             sticker.daily_earnings = 0.0
+        
+        # Reset population tracking variables
+        self.viral_recruits_today = 0
+        self.organic_new_players_today = 0
     
     def collect_daily_stats(self):
         """Collect comprehensive daily statistics"""
@@ -628,6 +680,15 @@ class AdvancedFYNDRSimulator:
             'avg_scans_per_player': statistics.mean([p.scans_today for p in active_players]) if active_players else 0,
             'avg_consecutive_days': statistics.mean([p.consecutive_days_active for p in active_players]) if active_players else 0,
             'event_active': self.is_event_active(),
+            
+            # === POPULATION & SPREAD METRICS ===
+            'total_population': self.config.total_population,
+            'population_density': self.config.population_density_per_quarter_sq_mile,
+            'max_possible_players': self.max_possible_players,
+            'population_penetration_rate': len(active_players) / self.config.total_population,
+            'viral_recruits_today': self.viral_recruits_today,
+            'organic_new_players_today': self.organic_new_players_today,
+            'population_cap_reached': len(active_players) >= self.max_possible_players,
         }
         self.daily_stats.append(daily_stat)
         return daily_stat
@@ -656,9 +717,6 @@ class AdvancedFYNDRSimulator:
             
             # Reset daily stats
             self.reset_daily_stats()
-            
-            # Update sticker decay
-            self.update_sticker_decay()
             
             # Simulate new player growth
             self.simulate_new_player_growth(day)
@@ -698,6 +756,9 @@ class AdvancedFYNDRSimulator:
         # Growth metrics
         total_growth = self.total_players_ever - len(active_players)
         
+        # Average level calculation
+        avg_level = statistics.mean([p.level for p in active_players]) if active_players else 1
+        
         return {
             'total_revenue': total_revenue,
             'total_points': total_points,
@@ -718,4 +779,17 @@ class AdvancedFYNDRSimulator:
             'avg_revenue_per_player': total_revenue / len(active_players) if active_players else 0,
             'points_per_scan': total_points / total_scans if total_scans > 0 else 0,
             'organic_purchase_rate': self.organic_purchases / max(len(active_players), 1),
+            'avg_level': avg_level,
+            'whale_count': player_types.get('whale', 0),
+            'grinder_count': player_types.get('grinder', 0),
+            'casual_count': player_types.get('casual', 0),
+            
+            # === POPULATION & SPREAD METRICS ===
+            'total_population': self.config.total_population,
+            'population_density': self.config.population_density_per_quarter_sq_mile,
+            'max_possible_players': self.max_possible_players,
+            'population_penetration_rate': len(active_players) / self.config.total_population,
+            'population_cap_reached': len(active_players) >= self.max_possible_players,
+            'viral_spread_rate': self.config.viral_spread_percentage,
+            'organic_growth_rate_range': f"{self.config.organic_growth_rate_min*100:.3f}%-{self.config.organic_growth_rate_max*100:.3f}%",
         }

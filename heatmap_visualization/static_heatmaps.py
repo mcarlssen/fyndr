@@ -9,7 +9,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
 import json
 import os
-from spatial_analysis import SpatialAnalyzer, create_spatial_analyzer_from_simulation
+from .spatial_analysis import SpatialAnalyzer, create_spatial_analyzer_from_simulation
 
 
 class StaticHeatmapGenerator:
@@ -187,9 +187,14 @@ class StaticHeatmapGenerator:
         
         return output_file
     
-    def generate_all_static_heatmaps(self, simulation_file: str, days: Optional[List[int]] = None) -> Dict[str, List[str]]:
+    def generate_all_static_heatmaps(self, simulation_file: str, days: Optional[List[int]] = None, output_dir: str = None) -> Dict[str, List[str]]:
         """Generate all static heatmaps for specified days"""
         simulation_data = self.load_simulation_data(simulation_file)
+        
+        # Use organized output directory if provided
+        if output_dir:
+            self.output_dir = output_dir
+            os.makedirs(output_dir, exist_ok=True)
         
         if days is None:
             # Generate for the last day only
