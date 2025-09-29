@@ -119,7 +119,10 @@ class CompleteSimulationAnalyzer:
         print(f"  Active Players: {latest_stats['active_players']:,}")
         print(f"  Total Revenue: ${latest_stats['total_revenue']:,.2f}")
         print(f"  Total Scans: {latest_stats['total_scans']:,}")
-        print(f"  Total Stickers Placed: {latest_stats['total_stickers_placed']:,}")
+        # Use actual sticker count from database, not the placement counter
+        actual_stickers = len(data.get('stickers', {}))
+        print(f"  Total Stickers: {actual_stickers:,}")
+        print(f"  Total Stickers Placed (attempts): {latest_stats['total_stickers_placed']:,}")
         print(f"  Retention Rate: {latest_stats['retention_rate']:.1%}")
         print(f"  Average Level: {latest_stats['avg_level']:.1f}")
         
@@ -165,8 +168,9 @@ class CompleteSimulationAnalyzer:
         # Scans per player per day
         avg_scans_per_player = latest_stats['total_scans'] / (latest_stats['active_players'] * total_days) if latest_stats['active_players'] > 0 else 0
         
-        # Stickers per player
-        stickers_per_player = latest_stats['total_stickers_placed'] / latest_stats['active_players'] if latest_stats['active_players'] > 0 else 0
+        # Stickers per player (use actual sticker count, not placement attempts)
+        actual_stickers = len(data.get('stickers', {}))
+        stickers_per_player = actual_stickers / latest_stats['active_players'] if latest_stats['active_players'] > 0 else 0
         
         # Daily revenue average
         daily_revenue_avg = latest_stats['total_revenue'] / total_days

@@ -50,12 +50,22 @@ class LifeSimConfig:
     
     # === SIMULATION CONTROL ===
     simulation_name: str = "FYNDR Life Sim - Population Mechanics"
-    max_days: int = 270  # 0 = run indefinitely
+    max_days: int = 365*2  # 0 = run indefinitely
     real_time_speed: float = 0  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
     auto_save_interval: int = 2000  # Save every N days
     enable_visualization: bool = True
     enable_console_output: bool = True
     auto_analyze_on_completion: bool = True  # Automatically run analysis when simulation completes
+
+    # === STARTING POPULATION ===
+    starting_player_count: int = 1000  # Number of players to start the simulation with
+    starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
+    
+    # === STARTING PLAYER REWARDS ===
+    starting_player_points: float = 100.0  # Starting points for initial players
+    starting_player_stickers: int = 0  # Free stickers for initial players
+    starting_whale_wallet_balance: float = 0.0  # Starting wallet balance for whale players
+    starting_whale_total_spent: float = 0.0  # Starting total spent for whale players
     
     # === CURRENT POINT CALCULATION ORDER ===
     # Base points
@@ -85,17 +95,14 @@ class LifeSimConfig:
     social_sneeze_bonus: float = 2.5  # Point multiplier during sneeze mode
     social_sneeze_duration_hours: float = 3.0  # How long sneeze mode lasts (hours)
     social_sneeze_cap: int = 1  # Maximum social sneeze bonuses per day (deprecated with sneeze mode)
-    
-    # === LEVELING SYSTEM ===
-    points_per_level: int = 100
-    max_level: int = 200
-    
-    # === LINEAR PROGRESSION SYSTEM ===
+        
+    # === LINEAR PROGRESSION LEVELING SYSTEM ===
     use_linear_progression: bool = True  # Enable/disable linear progression curve
     level_base_xp: int = 200  # XP required for level 1
     level_first_increment: int = 25  # XP increase from level 1 → 2
     level_increment_step: int = 34  # How much the increment grows each level (optimized for 9-month completion)
     level_xp_thresholds: List[int] = None  # Will be calculated in __post_init__
+    max_level: int = 200
     
     # === LEVEL MULTIPLIER SYSTEM ===
     level_multiplier_base: float = 1.0  # Base multiplier for level 1
@@ -103,7 +110,7 @@ class LifeSimConfig:
     
     # === LOCALE AND SCANNING BEHAVIOR ===
     locale_size_meters: float = 804.5  # Locale size in meters (804.5m square = 1 quarter sq mi)
-    sticker_density_per_quarter_sq_mile: int = 500  # Average stickers per 0.25 sq mi
+    sticker_density_per_locale_size: int = 500  # Average stickers per local 'unit'
     
     # === PLAYER MOVEMENT PATTERNS ===
     enable_movement_patterns: bool = True  # Enable realistic player movement
@@ -127,7 +134,7 @@ class LifeSimConfig:
     sticker_placement_cooldown_days: int = 0  # No cooldown - allow multiple stickers per day
     
     # === REALISTIC DENSITY SIMULATION ===
-    enable_realistic_density: bool = True  # Enable area-specific density limits
+    enable_realistic_density: bool = False  # Enable area-specific density limits
     campus_building_density: int = 1000  # High density in campus buildings
     campus_quad_density: int = 200  # Medium density in open areas
     campus_perimeter_density: int = 50  # Low density on campus edges
@@ -169,12 +176,10 @@ class LifeSimConfig:
     streak_bonus_days: int = 21  # Days of consecutive activity needed (legacy)
     streak_bonus_multiplier: float = 3  # Point multiplier during streak (legacy)
     
-    # Separate streak bonuses for different activities
-    scan_streak_bonus_days: int = 7  # Days of consecutive scanning needed
-    scan_streak_bonus_multiplier: float = 2.0  # Point multiplier for scanning streak
-    
-    placement_streak_bonus_days: int = 14  # Days of consecutive placement needed  
-    placement_streak_bonus_multiplier: float = 2  # Point multiplier for placement streak
+    # Tiered streak bonuses for scan and placement streaks
+    scan_streak_tiers: List[Tuple[int, float]] = None  # Will be set in __post_init__
+    placement_streak_tiers: List[Tuple[int, float]] = None  # Will be set in __post_init__
+    activity_streak_tiers: List[Tuple[int, float]] = None  # Will be set in __post_init__
     
     # Combined activity streak (scanning OR placing)
     activity_streak_bonus_days: int = 21  # Days of any activity needed
@@ -213,33 +218,23 @@ class LifeSimConfig:
     # Player type distribution for new players (overrides individual probabilities when enabled)
     use_population_mechanics: bool = True  # Enable/disable population-based growth
     new_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
-    
-    # === STARTING POPULATION ===
-    starting_player_count: int = 20  # Number of players to start the simulation with
-    starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
-    
-    # === STARTING PLAYER REWARDS ===
-    starting_player_points: float = 100.0  # Starting points for initial players
-    starting_player_stickers: int = 6  # Free stickers for initial players
-    starting_whale_wallet_balance: float = 0.0  # Starting wallet balance for whale players
-    starting_whale_total_spent: float = 0.0  # Starting total spent for whale players
 
     # === NEW PLAYER ONBOARDING ===
     # New player bonus: Boosts new players for their first week (no cooldown, one-time per player)
-    new_player_bonus_days: int = 7  # Days of bonus for new players
+    new_player_bonus_days: int = 14  # Days of bonus for new players
     new_player_bonus_multiplier: float = 3.0  # Point multiplier for new players
     new_player_free_packs: int = 0  # Free sticker packs for new players
     
     # === NEW PLAYER STARTING ASSETS ===
-    new_player_points: float = 0.0  # Starting points for new players (who join later)
+    new_player_points: float = 100.0  # Starting points for new players (who join later)
     new_player_stickers: int = 0  # Starting stickers for new players (0 = must earn/purchase)
     new_player_whale_wallet_balance: float = 0.0  # Starting wallet balance for new whale players
     new_player_whale_total_spent: float = 0.0  # Starting total spent for new whale players
     
     # Viral spread mechanics
-    viral_spread_percentage: float = 1.2  # avg .06 to 1.2% of active players recruit new players
-    viral_spread_frequency_min_days: int = 14  # Minimum days between viral spread events
-    viral_spread_frequency_max_days: int = 42  # Maximum days between viral spread events
+    viral_spread_percentage: float = 0.012  # 1.2% of active players recruit new players
+    viral_spread_frequency_min_days: int = 7  # Minimum days between viral spread events
+    viral_spread_frequency_max_days: int = 30  # Maximum days between viral spread events
     viral_spread_cap_percentage: float = 0.40  # Maximum 40% of total population can be players
     
     # Organic growth mechanics
@@ -273,6 +268,34 @@ class LifeSimConfig:
         if self.level_xp_thresholds is None:
             self.level_xp_thresholds = self._calculate_xp_thresholds()
         
+        # Initialize tiered streak bonuses
+        if self.scan_streak_tiers is None:
+            self.scan_streak_tiers = [
+                (8, 2.0),   # 8 days: 2x multiplier
+                (12, 3.0),  # 12 days: 3x multiplier
+                (17, 4.0),  # 17 days: 4x multiplier
+                (23, 5.0),  # 23 days: 5x multiplier
+                (30, 6.0)   # 30 days: 6x multiplier
+            ]
+        
+        if self.placement_streak_tiers is None:
+            self.placement_streak_tiers = [
+                (8, 2.0),   # 8 days: 2x multiplier
+                (12, 3.0),  # 12 days: 3x multiplier
+                (17, 4.0),  # 17 days: 4x multiplier
+                (23, 5.0),  # 23 days: 5x multiplier
+                (30, 6.0)   # 30 days: 6x multiplier
+            ]
+        
+        if self.activity_streak_tiers is None:
+            self.activity_streak_tiers = [
+                (8, 2.0),   # 8 days: 2x multiplier
+                (12, 3.0),  # 12 days: 3x multiplier
+                (17, 4.0),  # 17 days: 4x multiplier
+                (23, 5.0),  # 23 days: 5x multiplier
+                (30, 6.0)   # 30 days: 6x multiplier
+            ]
+        
         # Initialize realistic time-based churn curves based on industry benchmarks
         if self.churn_curves is None:
             self.churn_curves = {
@@ -298,9 +321,6 @@ class LifeSimConfig:
     
     def _calculate_xp_thresholds(self) -> List[int]:
         """Calculate XP thresholds for linear progression curve"""
-        if not self.use_linear_progression:
-            # Use simple fixed XP per level
-            return [self.points_per_level * (i + 1) for i in range(self.max_level)]
         
         thresholds = [self.level_base_xp]  # Level 1 threshold
         increment = self.level_first_increment
@@ -547,13 +567,18 @@ class FYNDRLifeSimulator:
     
     def _calculate_max_stickers_allowed(self) -> int:
         """Calculate the maximum number of stickers allowed based on locale area and density limits"""
-        # Convert locale size to quarter square miles
-        # 804.5m = 0.8045km = 0.8045/1.609 miles = 0.5 miles
-        # 0.5 miles square = 0.5^2 = 0.25 sq mi = 1 quarter sq mi
-        locale_area_quarter_sq_mi = (self.config.locale_size_meters / 1000 / 1.609) ** 2 / 0.25
+        # Calculate the actual playing field area in square meters
+        locale_area_meters = self.config.locale_size_meters ** 2
         
-        # Calculate target sticker count (hard cap, no multiplier)
-        max_stickers = int(locale_area_quarter_sq_mi * self.config.sticker_density_per_quarter_sq_mile)
+        # Fixed reference area: 804.5m × 804.5m = 647,220 square meters, or approx. 0.25 square miles
+        reference_area_sq_meters = 647220
+        
+        # Calculate density ratio: actual area / reference area
+        density_ratio = locale_area_meters / reference_area_sq_meters
+        
+        # Calculate target sticker count based on density ratio
+        max_stickers = int(self.config.sticker_density_per_locale_size * density_ratio)
+        #print(f"Max stickers allowed: {max_stickers} (area: {locale_area_meters:.0f} sq m, ratio: {density_ratio:.3f})")
         
         return max_stickers
         
@@ -696,11 +721,8 @@ class FYNDRLifeSimulator:
             owner.current_location[1] + random.uniform(-0.01, 0.01)
         )
         
-        # Check area-specific density limits
-        area_density_limit = self._get_area_density_limit(location)
-        nearby_stickers = self._count_stickers_in_area(location, 100)  # 100m radius
-        
-        if nearby_stickers >= area_density_limit:
+        # Check global density limit (500 stickers total)
+        if len(self.stickers) >= self.max_stickers_allowed:
             return False
         
         # Calculate placement streak bonus for the owner
@@ -715,26 +737,23 @@ class FYNDRLifeSimulator:
             creation_day=self.current_day
         )
         
-        # Atomic check and add - if we're at the limit, don't add the sticker
-        if len(self.stickers) < self.max_stickers_allowed:
-            self.stickers[self.next_sticker_id] = sticker
-            self.next_sticker_id += 1
-            self.total_stickers_placed += 1
-            
-            # Deduct sticker from inventory
-            owner.stickers_owned -= 1
-            
-            # Track player's last sticker placement
-            self.player_last_sticker_day[owner.id] = self.current_day
-            
-            # Award points to owner
-            owner.total_points += self.config.owner_base_points
-            owner.stickers_placed += 1
-            self.total_points_earned += self.config.owner_base_points
-            
-            return True
-        else:
-            return False
+        # Add the sticker (we already checked the limit above)
+        self.stickers[self.next_sticker_id] = sticker
+        self.next_sticker_id += 1
+        self.total_stickers_placed += 1
+        
+        # Deduct sticker from inventory
+        owner.stickers_owned -= 1
+        
+        # Track player's last sticker placement
+        self.player_last_sticker_day[owner.id] = self.current_day
+        
+        # Award points to owner
+        owner.total_points += self.config.owner_base_points
+        owner.stickers_placed += 1
+        self.total_points_earned += self.config.owner_base_points
+        
+        return True
     
     def _simulate_player_behavior(self, player: Player):
         """Simulate a single player's behavior for one day"""
@@ -826,17 +845,56 @@ class FYNDRLifeSimulator:
         
         return churn_prob
     
+    def _calculate_tiered_scan_streak_bonus(self, player: Player) -> float:
+        """Calculate tiered scan streak bonus based on consecutive scanning days"""
+        bonus = 1.0
+        
+        # Find the highest tier the player qualifies for
+        for days_required, multiplier in self.config.scan_streak_tiers:
+            if player.scan_streak_days >= days_required:
+                bonus = multiplier
+            else:
+                break  # Tiers are ordered by days, so we can stop at first failure
+        
+        return bonus
+    
+    def _calculate_tiered_placement_streak_bonus(self, player: Player) -> float:
+        """Calculate tiered placement streak bonus based on consecutive placement days"""
+        bonus = 1.0
+        
+        # Find the highest tier the player qualifies for
+        for days_required, multiplier in self.config.placement_streak_tiers:
+            if player.placement_streak_days >= days_required:
+                bonus = multiplier
+            else:
+                break  # Tiers are ordered by days, so we can stop at first failure
+        
+        return bonus
+    
+    def _calculate_tiered_activity_streak_bonus(self, player: Player) -> float:
+        """Calculate tiered activity streak bonus based on consecutive activity days"""
+        bonus = 1.0
+        
+        # Find the highest tier the player qualifies for
+        for days_required, multiplier in self.config.activity_streak_tiers:
+            if player.streak_days >= days_required:
+                bonus = multiplier
+            else:
+                break  # Tiers are ordered by days, so we can stop at first failure
+        
+        return bonus
+    
     def _calculate_placement_streak_bonus(self, player: Player) -> float:
         """Calculate placement streak bonus for sticker creation"""
         bonus = 1.0
         
-        # Apply placement streak bonus
-        if player.placement_streak_days >= self.config.placement_streak_bonus_days:
-            bonus *= self.config.placement_streak_bonus_multiplier
+        # Apply tiered placement streak bonus
+        placement_streak_bonus = self._calculate_tiered_placement_streak_bonus(player)
+        bonus *= placement_streak_bonus
         
-        # Apply activity streak bonus
-        if player.streak_days >= self.config.activity_streak_bonus_days:
-            bonus *= self.config.activity_streak_bonus_multiplier
+        # Apply tiered activity streak bonus
+        activity_streak_bonus = self._calculate_tiered_activity_streak_bonus(player)
+        bonus *= activity_streak_bonus
         
         return bonus
     
@@ -1052,13 +1110,13 @@ class FYNDRLifeSimulator:
         if self.current_day - player.join_day <= self.config.new_player_bonus_days:
             base_points *= self.config.new_player_bonus_multiplier
         
-        # Apply scan streak bonus (for scanning activity)
-        if player.scan_streak_days >= self.config.scan_streak_bonus_days:
-            base_points *= self.config.scan_streak_bonus_multiplier
+        # Apply tiered scan streak bonus (for scanning activity)
+        scan_streak_bonus = self._calculate_tiered_scan_streak_bonus(player)
+        base_points *= scan_streak_bonus
         
-        # Apply activity streak bonus (for any activity)
-        if player.streak_days >= self.config.activity_streak_bonus_days:
-            base_points *= self.config.activity_streak_bonus_multiplier
+        # Apply tiered activity streak bonus (for any activity)
+        activity_streak_bonus = self._calculate_tiered_activity_streak_bonus(player)
+        base_points *= activity_streak_bonus
         
         # Apply comeback bonus
         if player.days_since_last_scan >= self.config.comeback_bonus_days:
@@ -1101,13 +1159,13 @@ class FYNDRLifeSimulator:
         if self.current_day - scanner.join_day <= self.config.new_player_bonus_days:
             base_points *= self.config.new_player_bonus_multiplier
         
-        # Apply scan streak bonus (for the scanner's scanning activity)
-        if scanner.scan_streak_days >= self.config.scan_streak_bonus_days:
-            base_points *= self.config.scan_streak_bonus_multiplier
+        # Apply tiered scan streak bonus (for the scanner's scanning activity)
+        scan_streak_bonus = self._calculate_tiered_scan_streak_bonus(scanner)
+        base_points *= scan_streak_bonus
         
-        # Apply activity streak bonus (for the scanner's any activity)
-        if scanner.streak_days >= self.config.activity_streak_bonus_days:
-            base_points *= self.config.activity_streak_bonus_multiplier
+        # Apply tiered activity streak bonus (for the scanner's any activity)
+        activity_streak_bonus = self._calculate_tiered_activity_streak_bonus(scanner)
+        base_points *= activity_streak_bonus
         
         # Apply comeback bonus (for the scanner, not owner)
         if scanner.days_since_last_scan >= self.config.comeback_bonus_days:
@@ -1865,21 +1923,10 @@ class FYNDRLifeSimulator:
         daily_stats = self._calculate_daily_stats()
         self.daily_stats.append(daily_stats)
         
-        # Clean up inactive stickers (optional)
-        self._cleanup_inactive_stickers()
+        # Stickers remain active even when players churn (no cleanup)
         
         return daily_stats
     
-    def _cleanup_inactive_stickers(self):
-        """Remove stickers from inactive players (optional cleanup)"""
-        inactive_player_ids = {p.id for p in self.players.values() if not p.is_active}
-        stickers_to_remove = [
-            s.id for s in self.stickers.values() 
-            if s.owner_id in inactive_player_ids
-        ]
-        
-        for sticker_id in stickers_to_remove:
-            del self.stickers[sticker_id]
     
     def run_simulation(self, max_days: int = 0):
         """Run the simulation for specified days (0 = indefinitely)"""
@@ -2014,13 +2061,11 @@ class FYNDRLifeSimulator:
                 print(f"No simulation files found with prefix: {simulation_prefix}")
                 return
             
-            # Generate complete analysis
-            print("Generating complete simulation analysis...")
-            analyzer.generate_complete_summary_report()
-            analyzer.generate_level_focused_report()
-            analyzer.generate_economy_analysis()
-            analyzer.generate_retention_analysis()
-            analyzer.generate_viral_growth_analysis()
+                # Generate complete analysis
+                print("Generating complete simulation analysis...")
+                analyzer.generate_complete_summary_report()
+                analyzer.generate_level_focused_report()
+                analyzer.generate_complete_visualizations()
             
             print(f"Complete simulation analysis saved to: {simulation_prefix}_analysis/")
             
@@ -2044,44 +2089,6 @@ class FYNDRLifeSimulator:
             print(f"Error during analysis: {e}")
             print("Continuing without analysis...")
     
-    def load_simulation_state(self, filename: str):
-        """Load simulation state from file"""
-        with open(filename, 'r') as f:
-            state = json.load(f)
-        
-        # Restore config
-        self.config = LifeSimConfig(**state["config"])
-        
-        # Restore simulation state
-        self.current_day = state["current_day"]
-        self.total_revenue = state["total_revenue"]
-        self.total_points_earned = state["total_points_earned"]
-        self.total_scans = state["total_scans"]
-        self.total_stickers_placed = state["total_stickers_placed"]
-        
-        # Restore players
-        self.players = {}
-        for k, v in state["players"].items():
-            player_data = v.copy()
-            # Convert last_scan_times back to int keys
-            if "last_scan_times" in player_data:
-                player_data["last_scan_times"] = {int(k): v for k, v in player_data["last_scan_times"].items()}
-            self.players[int(k)] = Player(**player_data)
-        
-        # Restore stickers
-        self.stickers = {}
-        for k, v in state["stickers"].items():
-            sticker_data = v.copy()
-            # Convert unique_scanners back to set
-            if "unique_scanners" in sticker_data:
-                sticker_data["unique_scanners"] = set(sticker_data["unique_scanners"])
-            self.stickers[int(k)] = Sticker(**sticker_data)
-        
-        # Restore daily stats
-        self.daily_stats = [DailyStats(**s) for s in state["daily_stats"]]
-        
-        print(f"Simulation state loaded from {filename}")
-
 # ============================================================================
 # CONFIGURATION MANAGEMENT
 # ============================================================================
@@ -2106,7 +2113,6 @@ def load_config_from_okr_results(okr_file: str) -> LifeSimConfig:
         social_sneeze_threshold=multiplayer_config["social_sneeze_threshold"],
         social_sneeze_bonus=multiplayer_config["social_sneeze_bonus"],
         social_sneeze_cap=multiplayer_config["social_sneeze_cap"],
-        points_per_level=multiplayer_config["points_per_level"],
         max_level=multiplayer_config["max_level"],
         pack_price_points=multiplayer_config["pack_price_points"],
         pack_price_dollars=multiplayer_config["pack_price_dollars"],
@@ -2152,6 +2158,9 @@ def main():
     parser.add_argument('--speed', type=float, help='Simulation speed multiplier')
     parser.add_argument('--template', action='store_true', help='Generate configuration template')
     parser.add_argument('--load-state', type=str, help='Load existing simulation state')
+    parser.add_argument('--deep-simulation', action='store_true', help='Run deep simulation (15 runs averaged)')
+    parser.add_argument('--deep-simulations', type=int, default=15, help='Number of simulations for deep mode')
+    parser.add_argument('--deep-console-output', action='store_true', help='Enable console output during deep simulation')
     
     args = parser.parse_args()
     
@@ -2176,6 +2185,27 @@ def main():
     if args.speed is not None:
         config.real_time_speed = args.speed
     
+    # Check if deep simulation is requested
+    if args.deep_simulation:
+        # Import and run deep simulation
+        from deep_simulation_runner import run_deep_simulation
+        
+        days_to_run = args.days if args.days is not None else config.max_days
+        
+        print("Running deep simulation mode...")
+        result = run_deep_simulation(
+            config_file=args.config,
+            okr_results_file=args.okr_results,
+            days=days_to_run,
+            num_simulations=args.deep_simulations,
+            enable_console_output=args.deep_console_output,
+            auto_analyze=True
+        )
+        
+        print("\nDeep simulation completed successfully!")
+        return
+    
+    # Regular simulation mode
     # Create and run simulator
     simulator = FYNDRLifeSimulator(config)
     
