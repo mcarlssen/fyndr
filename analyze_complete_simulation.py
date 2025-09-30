@@ -120,7 +120,7 @@ class CompleteSimulationAnalyzer:
         print(f"  Total Revenue: ${latest_stats['total_revenue']:,.2f}")
         print(f"  Total Scans: {latest_stats['total_scans']:,}")
         # Use actual sticker count from database, not the placement counter
-        actual_stickers = len(data.get('stickers', {}))
+        actual_stickers = len(self.combined_data.get('stickers', {}))
         print(f"  Total Stickers: {actual_stickers:,}")
         print(f"  Total Stickers Placed (attempts): {latest_stats['total_stickers_placed']:,}")
         print(f"  Retention Rate: {latest_stats['retention_rate']:.1%}")

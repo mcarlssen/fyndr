@@ -50,7 +50,7 @@ class LifeSimConfig:
     
     # === SIMULATION CONTROL ===
     simulation_name: str = "FYNDR Life Sim - Population Mechanics"
-    max_days: int = 365*2  # 0 = run indefinitely
+    max_days: int = 270  # 0 = run indefinitely
     real_time_speed: float = 0  # 1.0 = real time, 0.1 = 10x faster, 10.0 = 10x slower
     auto_save_interval: int = 2000  # Save every N days
     enable_visualization: bool = True
@@ -58,7 +58,7 @@ class LifeSimConfig:
     auto_analyze_on_completion: bool = True  # Automatically run analysis when simulation completes
 
     # === STARTING POPULATION ===
-    starting_player_count: int = 1000  # Number of players to start the simulation with
+    starting_player_count: int = 20  # Number of players to start the simulation with
     starting_player_type_ratios: Dict[str, float] = None  # Will be set in __post_init__
     
     # === STARTING PLAYER REWARDS ===
@@ -191,9 +191,9 @@ class LifeSimConfig:
 
      # === EVENTS ===
     # Seasonal/special events: Randomly triggered events that boost all point earnings
-    event_frequency_days: int = 21  # Average days between events (randomly triggered)
-    event_duration_days: int = 7  # How long events last once triggered
-    event_bonus_multiplier: float = 1.5  # Point multiplier during events (applies to all scans)
+    event_frequency_days: int = 7  # Average days between events (randomly triggered)
+    event_duration_days: int = 2  # How long events last once triggered
+    event_bonus_multiplier: float = 5  # Point multiplier during events (applies to all scans)
     
     # === REFERRAL REWARD SYSTEM ===
     # Referral rewards: Players who refer others get bonuses
@@ -234,7 +234,7 @@ class LifeSimConfig:
     # Viral spread mechanics
     viral_spread_percentage: float = 0.012  # 1.2% of active players recruit new players
     viral_spread_frequency_min_days: int = 7  # Minimum days between viral spread events
-    viral_spread_frequency_max_days: int = 30  # Maximum days between viral spread events
+    viral_spread_frequency_max_days: int = 14  # Maximum days between viral spread events
     viral_spread_cap_percentage: float = 0.40  # Maximum 40% of total population can be players
     
     # Organic growth mechanics
@@ -363,6 +363,7 @@ class Player:
     scanned_today: bool = False  # Did player scan today?
     placed_today: bool = False  # Did player place a sticker today?
     last_scan_times: Dict[int, int] = None  # sticker_id -> day
+    last_scan_locations: Dict[int, Tuple[float, float]] = None  # sticker_id -> location
     favorite_venues: List[str] = None
     location: Tuple[float, float] = None  # (lat, lng)
     join_day: int = 0
@@ -394,6 +395,8 @@ class Player:
     def __post_init__(self):
         if self.last_scan_times is None:
             self.last_scan_times = {}
+        if self.last_scan_locations is None:
+            self.last_scan_locations = {}
         if self.favorite_venues is None:
             self.favorite_venues = []
         if self.social_hubs is None:
@@ -420,6 +423,11 @@ class Sticker:
     creation_day: int = 0
     total_scans: int = 0
     unique_scanners: set = None
+    total_earnings: float = 0.0
+    daily_earnings: float = 0.0
+    scans_today: int = 0
+    unique_scans_today: int = 0
+    days_since_last_scan: int = 0
     
     # Social sneeze mode tracking
     is_in_sneeze_mode: bool = False
@@ -564,6 +572,29 @@ class FYNDRLifeSimulator:
         
         # Initialize with some starting players
         self._initialize_starting_population()
+    
+    def _calculate_xp_threshold(self, level: int) -> int:
+        """Calculate XP threshold for a specific level"""
+        if level <= 0 or level > self.config.max_level:
+            return float('inf')
+        
+        # Level 1 threshold is base_xp
+        if level == 1:
+            return self.config.level_base_xp
+        
+        # For levels 2+, use the thresholds list
+        if level - 1 < len(self.config.level_xp_thresholds):
+            return self.config.level_xp_thresholds[level - 1]
+        
+        # Fallback calculation if thresholds list is incomplete
+        increment = self.config.level_first_increment
+        current = self.config.level_base_xp
+        
+        for lvl in range(2, level + 1):
+            current += increment
+            increment += self.config.level_increment_step
+        
+        return current
     
     def _calculate_max_stickers_allowed(self) -> int:
         """Calculate the maximum number of stickers allowed based on locale area and density limits"""
@@ -1012,7 +1043,7 @@ class FYNDRLifeSimulator:
         simulate_casual_behavior(self, player)
     
     def _simulate_scan_behavior(self, player: Player):
-        """Simulate a player scanning stickers with geographic constraints"""
+        """Simulate a player scanning stickers with geographic constraints (legacy - once per day)"""
         # Update player movement first
         current_time_hours = (self.current_day % 1) * 24
         self._update_player_movement(player, current_time_hours)
@@ -1061,24 +1092,183 @@ class FYNDRLifeSimulator:
         player.days_since_last_scan = 0
         player.last_scan_times[sticker.id] = self.current_day
         
-        # Check for level up
-        self._check_level_up(player)
-        
-        # Award points to sticker owner (if not scanning their own sticker)
-        if sticker.owner_id != player.id:
-            owner = self.players.get(sticker.owner_id)
-            if owner and owner.is_active:
-                owner.total_points += owner_points
-                owner.total_xp += int(owner_points)  # Convert points to XP
-                # Check for owner level up
-                self._check_level_up(owner)
+        # Award points to sticker owner
+        if sticker.owner_id in self.players:
+            owner = self.players[sticker.owner_id]
+            owner.total_points += owner_points
+            owner.total_xp += int(owner_points)
+            sticker.total_earnings += owner_points
+            sticker.daily_earnings += owner_points
         
         # Update sticker stats
+        sticker.scans_today += 1
         sticker.total_scans += 1
-        sticker.unique_scanners.add(player.id)
+        sticker.days_since_last_scan = 0
+        if sticker.unique_scans_today == 0:
+            sticker.unique_scans_today = 1
         
+        # Update global stats
         self.total_scans += 1
         self.total_points_earned += scanner_points + owner_points
+        
+        # Update player's last scan location
+        player.last_scan_locations[sticker.id] = player.current_location
+        
+        # Update player's favorite venues
+        if player.favorite_venues is None:
+            player.favorite_venues = []
+        if sticker.venue_type not in player.favorite_venues:
+            player.favorite_venues.append(sticker.venue_type)
+        
+        # Update player's last activity day
+        player.last_activity_day = self.current_day
+        
+        # Check for social sneeze mode
+        if sticker.scans_today >= self.config.social_sneeze_threshold:
+            sticker.is_in_sneeze_mode = True
+            sticker.sneeze_mode_start_day = self.current_day
+        
+        # Check for comeback bonus
+        if player.days_since_last_scan >= self.config.comeback_bonus_days:
+            player.comeback_bonus_active = True
+            player.comeback_bonus_remaining = self.config.comeback_bonus_days
+        
+        # Check for streak bonuses
+        if player.days_since_last_scan == 0:
+            player.scan_streak_days += 1
+        else:
+            player.scan_streak_days = 1
+        
+        # Check for level up
+        if player.total_xp >= self._calculate_xp_threshold(player.level + 1):
+            player.level += 1
+            player.last_level_up_day = self.current_day
+            
+            # Log level up
+            self._log_event(
+                "player_level_up",
+                f"Player {player.id} leveled up to level {player.level}",
+                affected_players=1,
+                additional_data={
+                    "player_id": player.id,
+                    "new_level": player.level,
+                    "total_xp": player.total_xp
+                }
+            )
+    
+    def _simulate_scan_behavior_per_sticker(self, player: Player, scan_probability: float):
+        """Simulate a player attempting to scan each available sticker with given probability"""
+        # Update player movement first
+        current_time_hours = (self.current_day % 1) * 24
+        self._update_player_movement(player, current_time_hours)
+        
+        # Find available stickers within scanning distance
+        if self.config.enable_movement_patterns:
+            available_stickers = self._get_nearby_stickers(player)
+        else:
+            # Fallback to all stickers if movement patterns disabled
+            available_stickers = []
+            for sticker in self.stickers.values():
+                if not sticker.is_active:
+                    continue
+                available_stickers.append(sticker)
+        
+        # Filter by cooldown
+        filtered_stickers = []
+        for sticker in available_stickers:
+            if sticker.id in player.last_scan_times:
+                days_since_scan = self.current_day - player.last_scan_times[sticker.id]
+                if days_since_scan < (self.config.sticker_scan_cooldown_hours / 24):
+                    continue
+            filtered_stickers.append(sticker)
+        
+        available_stickers = filtered_stickers
+        
+        if not available_stickers:
+            return
+        
+        # Attempt to scan each available sticker with the given probability
+        for sticker in available_stickers:
+            if random.random() < scan_probability:
+                # Get current time in hours (simplified - using day progress)
+                current_time_hours = (self.current_day % 1) * 24  # Hours within current day
+                
+                # Calculate points earned by scanner
+                scanner_points = self._calculate_scan_points(player, sticker, current_time_hours)
+                
+                # Calculate points earned by sticker owner
+                owner_points = self._calculate_owner_points(sticker, player, current_time_hours)
+                
+                # Award points and XP to scanner
+                player.total_points += scanner_points
+                player.total_xp += int(scanner_points)  # Convert points to XP
+                player.stickers_scanned += 1
+                player.days_since_last_scan = 0
+                player.last_scan_times[sticker.id] = self.current_day
+                
+                # Award points to sticker owner
+                if sticker.owner_id in self.players:
+                    owner = self.players[sticker.owner_id]
+                    owner.total_points += owner_points
+                    owner.total_xp += int(owner_points)
+                    sticker.total_earnings += owner_points
+                    sticker.daily_earnings += owner_points
+                
+                # Update sticker stats
+                sticker.scans_today += 1
+                sticker.total_scans += 1
+                sticker.days_since_last_scan = 0
+                if sticker.unique_scans_today == 0:
+                    sticker.unique_scans_today = 1
+                
+                # Update global stats
+                self.total_scans += 1
+                self.total_points_earned += scanner_points + owner_points
+                
+                # Update player's last scan location
+                player.last_scan_locations[sticker.id] = player.current_location
+                
+                # Update player's favorite venues
+                if player.favorite_venues is None:
+                    player.favorite_venues = []
+                if sticker.venue_type not in player.favorite_venues:
+                    player.favorite_venues.append(sticker.venue_type)
+                
+                # Update player's last activity day
+                player.last_activity_day = self.current_day
+                
+                # Check for social sneeze mode
+                if sticker.scans_today >= self.config.social_sneeze_threshold:
+                    sticker.is_in_sneeze_mode = True
+                    sticker.sneeze_mode_start_day = self.current_day
+                
+                # Check for comeback bonus
+                if player.days_since_last_scan >= self.config.comeback_bonus_days:
+                    player.comeback_bonus_active = True
+                    player.comeback_bonus_remaining = self.config.comeback_bonus_days
+                
+                # Check for streak bonuses
+                if player.days_since_last_scan == 0:
+                    player.scan_streak_days += 1
+                else:
+                    player.scan_streak_days = 1
+        
+        # Check for level up
+        if player.total_xp >= self._calculate_xp_threshold(player.level + 1):
+            player.level += 1
+            player.last_level_up_day = self.current_day
+            
+            # Log level up
+            self._log_event(
+                "player_level_up",
+                f"Player {player.id} leveled up to level {player.level}",
+                affected_players=1,
+                additional_data={
+                    "player_id": player.id,
+                    "new_level": player.level,
+                    "total_xp": player.total_xp
+                }
+            )
     
     def _calculate_scan_points(self, player: Player, sticker: Sticker, current_time_hours: float) -> float:
         """Calculate points earned from scanning a sticker"""
