@@ -112,6 +112,6 @@ def simulate_whale_behavior(simulator: 'FYNDRLifeSimulator', player: 'Player'):
                 )
     
     # 5. SCANNING BEHAVIOR (low priority for whales)
-    if random.random() < simulator.config.whale_scan_percentage:  # 30% chance to scan
-        simulator._simulate_scan_behavior(player)
-        player.scanned_today = True
+    # Whales attempt to scan each available sticker with whale_scan_percentage probability
+    simulator._simulate_scan_behavior_per_sticker(player, simulator.config.whale_scan_percentage)
+    player.scanned_today = True

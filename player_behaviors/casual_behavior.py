@@ -125,6 +125,6 @@ def simulate_casual_behavior(simulator: 'FYNDRLifeSimulator', player: 'Player'):
             )
     
     # Scanning (moderate priority)
-    if random.random() < simulator.config.casual_scan_percentage:  # Use config variable
-        simulator._simulate_scan_behavior(player)
-        player.scanned_today = True
+    # Casuals attempt to scan each available sticker with casual_scan_percentage probability
+    simulator._simulate_scan_behavior_per_sticker(player, simulator.config.casual_scan_percentage)
+    player.scanned_today = True

@@ -107,9 +107,9 @@ def simulate_grinder_behavior(simulator: 'FYNDRLifeSimulator', player: 'Player')
                     )
     
     # 4. SCANNING BEHAVIOR (high priority for streaks and bonuses)
-    if random.random() < simulator.config.grinder_scan_percentage:  # Use config variable
-        simulator._simulate_scan_behavior(player)
-        player.scanned_today = True
+    # Grinders attempt to scan each available sticker with grinder_scan_percentage probability
+    simulator._simulate_scan_behavior_per_sticker(player, simulator.config.grinder_scan_percentage)
+    player.scanned_today = True
     
     # 5. STICKER PLACEMENT (low priority)
     if player.stickers_owned > 0 and random.random() < 0.2:  # 20% chance to place sticker

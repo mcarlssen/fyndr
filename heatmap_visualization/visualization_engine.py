@@ -10,7 +10,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional, Any
 import os
 import json
-from .spatial_analysis import SpatialAnalyzer, create_spatial_analyzer_from_simulation
+from spatial_analysis import SpatialAnalyzer, create_spatial_analyzer_from_simulation
 
 
 class HeatmapVisualizer:
